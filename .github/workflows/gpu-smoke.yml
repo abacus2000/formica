@@ -1,0 +1,77 @@
+name: gpu-smoke
+
+# Optional smoke test that exercises the AWS MCP exec tool against an
+# EXISTING GPU instance. This workflow MUST NOT provision capacity — it
+# only runs `nvidia-smi` via SSM SendCommand on a pre-existing instance
+# whose ID is provided as a repo secret.
+#
+# In a fork with no secrets set, the workflow short-circuits as a no-op
+# so it will never fail CI for external contributors.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekly sanity check on Monday 06:17 UTC.
+    - cron: "17 6 * * 1"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Short-circuit if no GPU instance configured
+        id: guard
+        shell: bash
+        run: |
+          if [[ -z "${{ secrets.FORMICA_GPU_INSTANCE_ID }}" ]]; then
+            echo "No FORMICA_GPU_INSTANCE_ID secret — skipping (expected in forks)."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-python@v5
+        if: steps.guard.outputs.skip == 'false'
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install
+        if: steps.guard.outputs.skip == 'false'
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Configure AWS via OIDC
+        if: steps.guard.outputs.skip == 'false'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.FORMICA_GPU_SMOKE_ROLE_ARN }}
+          aws-region: ${{ secrets.FORMICA_GPU_SMOKE_REGION }}
+
+      - name: Run nvidia-smi on existing instance (no provisioning)
+        if: steps.guard.outputs.skip == 'false'
+        env:
+          INSTANCE_ID: ${{ secrets.FORMICA_GPU_INSTANCE_ID }}
+        run: |
+          python - <<'PY'
+          import os, sys
+          from formica.tools.aws_exec import run_shell_on_instance
+          iid = os.environ["INSTANCE_ID"]
+          if not iid.startswith("i-"):
+              sys.exit("Refusing non-instance target")
+          out = run_shell_on_instance(iid, "nvidia-smi --query-gpu=name,driver_version --format=csv,noheader")
+          print(out)
+          PY
+
+      - name: Assert no provisioning APIs were called
+        if: steps.guard.outputs.skip == 'false'
+        run: |
+          # aws_exec.py must only call ssm:SendCommand. This grep catches any
+          # stray call sites slipping in over time.
+          ! grep -RIn "run_instances\|UpdateNodegroupConfig\|CreateNodegroup\|SetDesiredCapacity\|CreateFleet" formica/

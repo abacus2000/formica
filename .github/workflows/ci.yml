@@ -1,0 +1,59 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,openai]"
+      - name: Lint
+        run: ruff check formica/ tests/
+      - name: No provisioning APIs
+        run: |
+          ! grep -RIn "run_instances\|UpdateNodegroupConfig\|CreateNodegroup\|SetDesiredCapacity" formica/
+      - name: Unit tests
+        run: pytest tests/unit -v --maxfail=1
+      - name: Integration tests
+        run: pytest tests/integration -v --maxfail=1
+      - name: E2E (toy math)
+        run: pytest tests/e2e -v --maxfail=1
+
+  helm-kustomize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: "v3.14.4"
+      - name: Helm lint
+        run: helm lint deploy/helm/formica
+      - uses: azure/setup-kubectl@v4
+      - name: Kustomize build (dev)
+        run: kubectl kustomize deploy/k8s/overlays/dev > /tmp/dev.yaml && head -5 /tmp/dev.yaml
+
+  terraform-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.5"
+      - name: Terraform fmt
+        run: terraform -chdir=deploy/terraform fmt -check -recursive
+      - name: Terraform init (no backend)
+        run: terraform -chdir=deploy/terraform init -backend=false
+      - name: Terraform validate
+        run: terraform -chdir=deploy/terraform validate
