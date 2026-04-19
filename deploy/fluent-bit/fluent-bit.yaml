@@ -1,0 +1,155 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fluent-bit
+  namespace: formica
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: fluent-bit-read
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces", "pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: fluent-bit-read
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: fluent-bit-read
+subjects:
+  - { kind: ServiceAccount, name: fluent-bit, namespace: formica }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-config
+  namespace: formica
+data:
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush         5
+        Daemon        Off
+        Log_Level     info
+        Parsers_File  parsers.conf
+        HTTP_Server   On
+        HTTP_Listen   0.0.0.0
+        HTTP_Port     2020
+
+    [INPUT]
+        Name              tail
+        Path              /var/log/containers/*formica*.log
+        Parser            cri
+        Tag               kube.*
+        Refresh_Interval  5
+        Mem_Buf_Limit     32MB
+        Skip_Long_Lines   On
+
+    # Parse the JSON payload embedded in the CRI log line.
+    [FILTER]
+        Name     parser
+        Match    kube.*
+        Key_Name log
+        Parser   json
+        Reserve_Data On
+
+    # Kubernetes metadata (pod name, labels).
+    [FILTER]
+        Name                kubernetes
+        Match               kube.*
+        Merge_Log           On
+        Keep_Log            Off
+        K8S-Logging.Parser  On
+        K8S-Logging.Exclude Off
+
+    # Split by severity → errors log group
+    [FILTER]
+        Name   rewrite_tag
+        Match  kube.*
+        Rule   $level ^(ERROR|CRITICAL|FATAL)$ errors.$TAG true
+
+    # Split by driver-name → drivers log group
+    [FILTER]
+        Name   rewrite_tag
+        Match  kube.*
+        Rule   $logger ^(neo4j|strands|kubernetes|urllib3|botocore|boto3|aws|mcp|cuda|nvidia)\.   drivers.$TAG true
+
+    # Errors → /formica/{env}/{region}/errors
+    [OUTPUT]
+        Name                  cloudwatch_logs
+        Match                 errors.*
+        region                ${AWS_REGION}
+        log_group_name        /formica/${FORMICA_ENV}/${AWS_REGION}/errors
+        log_stream_prefix     $(kubernetes['labels']['app.kubernetes.io/component'])/
+        auto_create_group     true
+        log_retention_days    ${LOG_RETENTION_DAYS}
+        log_format            json
+
+    # Drivers → /formica/{env}/{region}/drivers
+    [OUTPUT]
+        Name                  cloudwatch_logs
+        Match                 drivers.*
+        region                ${AWS_REGION}
+        log_group_name        /formica/${FORMICA_ENV}/${AWS_REGION}/drivers
+        log_stream_prefix     $(kubernetes['labels']['app.kubernetes.io/component'])/
+        auto_create_group     true
+        log_retention_days    ${LOG_RETENTION_DAYS}
+        log_format            json
+
+  parsers.conf: |
+    [PARSER]
+        Name        json
+        Format      json
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L
+        Time_Keep   On
+
+    [PARSER]
+        Name        cri
+        Format      regex
+        Regex       ^(?<time>[^ ]+) (?<stream>stdout|stderr) (?<logtag>[^ ]*) (?<log>.*)$
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L%z
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: aws-for-fluent-bit
+  namespace: formica
+  labels:
+    app.kubernetes.io/component: fluent-bit
+spec:
+  selector:
+    matchLabels: { app.kubernetes.io/component: fluent-bit }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/component: fluent-bit }
+    spec:
+      serviceAccountName: fluent-bit
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name: fluent-bit
+          image: public.ecr.aws/aws-observability/aws-for-fluent-bit:stable
+          imagePullPolicy: IfNotPresent
+          env:
+            - { name: FORMICA_ENV,         value: "dev" }
+            - { name: AWS_REGION,          value: "us-east-1" }
+            - { name: LOG_RETENTION_DAYS,  value: "30" }
+          volumeMounts:
+            - { name: varlog,              mountPath: /var/log }
+            - { name: varlibdockercontainers, mountPath: /var/lib/docker/containers, readOnly: true }
+            - { name: config,              mountPath: /fluent-bit/etc/ }
+          resources:
+            requests: { cpu: "50m",  memory: "64Mi" }
+            limits:   { cpu: "200m", memory: "256Mi" }
+      volumes:
+        - name: varlog
+          hostPath: { path: /var/log }
+        - name: varlibdockercontainers
+          hostPath: { path: /var/lib/docker/containers }
+        - name: config
+          configMap: { name: fluent-bit-config }
