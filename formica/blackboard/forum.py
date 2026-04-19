@@ -179,6 +179,24 @@ class Forum:
         with self._session() as s:
             return [dict(r) for r in s.run(cypher, oid=objective_id, limit=limit)]
 
+    def list_unvalidated_evidence(
+        self, objective_id: str, limit: int = 32
+    ) -> list[dict]:
+        """Evidence in this objective's tree that has no Validation yet.
+
+        Used by the in-process tick loop (``formica solve --local``) to decide
+        which Evidence to hand to a Validator next.
+        """
+        cypher = """
+        MATCH (o:Objective {id: $oid})<-[:CHILD_OF*1..6]-(sp:SubProblem)<-[:SUPPORTS]-(e:Evidence)
+        WHERE NOT (e)<-[:JUDGED]-(:Validation)
+        RETURN e.id AS id, e.content AS content, e.sources AS sources, sp.id AS sp_id
+        ORDER BY e.created_at ASC
+        LIMIT $limit
+        """
+        with self._session() as s:
+            return [dict(r) for r in s.run(cypher, oid=objective_id, limit=limit)]
+
     def list_validated_evidence(
         self, objective_id: str, threshold: float
     ) -> list[dict]:
