@@ -1,0 +1,48 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: formica-evaporation
+  namespace: formica
+spec:
+  schedule: "* * * * *"           # every minute
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: formica-controller
+          restartPolicy: OnFailure
+          containers:
+            - name: evaporate
+              image: formica:latest
+              imagePullPolicy: IfNotPresent
+              command: ["python", "-m", "formica.cli", "evaporate"]
+              env:
+                - { name: FORMICA_NEO4J_URI, value: "bolt://neo4j.formica.svc.cluster.local:7687" }
+                - name: FORMICA_NEO4J_PASSWORD
+                  valueFrom: { secretKeyRef: { name: neo4j-auth, key: NEO4J_PASSWORD } }
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: formica-alarm-evaporation
+  namespace: formica
+spec:
+  # Alarm half-life is short (~30s); evaporate more frequently.
+  schedule: "*/1 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: formica-controller
+          restartPolicy: OnFailure
+          containers:
+            - name: evaporate-alarm
+              image: formica:latest
+              imagePullPolicy: IfNotPresent
+              command: ["python", "-m", "formica.cli", "evaporate", "--min-pheromone", "0.01"]
+              env:
+                - { name: FORMICA_NEO4J_URI, value: "bolt://neo4j.formica.svc.cluster.local:7687" }
+                - name: FORMICA_NEO4J_PASSWORD
+                  valueFrom: { secretKeyRef: { name: neo4j-auth, key: NEO4J_PASSWORD } }
