@@ -18,9 +18,19 @@ class FormicaConfig(BaseSettings):
     neo4j_password: str = "changeme"
     neo4j_database: str = "neo4j"
 
-    # LLM model
-    model_base_url: str = "http://localhost:11434/v1"
-    model_id: str = "llama3.1"
+    # LLM model.
+    #
+    # Formica defaults to the open-weight model that is pre-baked into the GPU
+    # AMI (shared with the rome project): Mistral-7B-Instruct-v0.2-AWQ, served
+    # by vLLM on :8080 with an OpenAI-compatible API. Weights live at
+    # /opt/models/mistral-awq on the AMI; the bundled docker-compose mounts
+    # that path into the vllm container read-only so nothing is downloaded at
+    # boot. See docs/local-gpu-dev.md and docs/decisions/0007-open-weight-default.md.
+    #
+    # To switch to another provider (e.g. Bedrock for prod) override with env:
+    #   FORMICA_MODEL_PROVIDER=bedrock FORMICA_MODEL_ID=anthropic.claude-3-...
+    model_base_url: str = "http://localhost:8080/v1"
+    model_id: str = "TheBloke/Mistral-7B-Instruct-v0.2-AWQ"
     model_provider: str = "openai"  # openai | ollama | bedrock
 
     # Kubernetes
