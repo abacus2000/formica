@@ -1,6 +1,6 @@
 # ADR 0007: Default to open-weight Mistral-7B-AWQ served by local vLLM
 
-- Status: Accepted
+- Status: Accepted (amended 2026-04-19, see ADR-0008)
 - Date: 2026-04-19
 
 ## Context
@@ -23,14 +23,18 @@ weights at `/opt/models/mistral-awq`). That AMI already exists
 
 Formica defaults to the same open-weight model, served the same way:
 
-- `FormicaConfig.model_base_url` defaults to `http://localhost:8080/v1`.
+- `FormicaConfig.model_base_url` defaults to the in-cluster Service DNS
+  `http://vllm.formica.svc.cluster.local:8080/v1`. Out-of-cluster
+  callers (e.g. the CLI on a laptop) port-forward and override with
+  `FORMICA_MODEL_BASE_URL=http://localhost:8080/v1`.
 - `FormicaConfig.model_id` defaults to `TheBloke/Mistral-7B-Instruct-v0.2-AWQ`.
 - `FormicaConfig.model_provider` defaults to `openai` (the provider
   protocol, not the vendor — vLLM speaks it natively).
-- `deploy/compose/docker-compose.yml` launches Neo4j + vLLM with the
-  weights bind-mounted from `/opt/models/mistral-awq:ro`.
-- `formica solve --local` runs the Scout/Forager/Validator/GC tick loop
-  in-process so a single EC2 box is sufficient for end-to-end testing.
+- vLLM ships as an in-cluster `Deployment` + `Service`
+  (`deploy/k8s/base/vllm.yaml`) with weights bind-mounted via
+  `hostPath` on single-box clusters; swap for a PVC in EKS overlays.
+- Single-box development runs the same manifests under k3d. See
+  ADR-0008 and `docs/single-box.md`.
 
 Hosted providers (Bedrock, OpenAI) remain opt-in via
 `FORMICA_MODEL_PROVIDER=bedrock` + `FORMICA_MODEL_ID=…`.

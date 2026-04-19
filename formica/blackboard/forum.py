@@ -184,8 +184,8 @@ class Forum:
     ) -> list[dict]:
         """Evidence in this objective's tree that has no Validation yet.
 
-        Used by the in-process tick loop (``formica solve --local``) to decide
-        which Evidence to hand to a Validator next.
+        Used by Validator pods to discover work: a Validator Job tails this
+        list, picks one Evidence, judges it, and writes back a Validation.
         """
         cypher = """
         MATCH (o:Objective {id: $oid})<-[:CHILD_OF*1..6]-(sp:SubProblem)<-[:SUPPORTS]-(e:Evidence)

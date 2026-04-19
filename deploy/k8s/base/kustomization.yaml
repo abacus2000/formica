@@ -5,6 +5,7 @@ resources:
   - namespace.yaml
   - rbac.yaml
   - neo4j.yaml
+  - vllm.yaml
   - controller.yaml
   - evaporation-cron.yaml
   - ../../otel-collector/collector.yaml

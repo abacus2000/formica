@@ -34,28 +34,53 @@ See [`docs/port-notes.md`](docs/port-notes.md) for the full mapping.
 - **Capacity awareness** — spawn controller observes cluster headroom; never requests new compute;
   passively absorbs nodes added at runtime.
 
-## Quick start (single GPU box)
+## Quick start
 
-Formica ships configured for the open-weight GPU AMI shared with `rome`
-(`ami-079c82d610e02e480`: AL2023 + NVIDIA drivers + CUDA + Docker +
-Mistral-7B-Instruct-v0.2-AWQ weights at `/opt/models/mistral-awq`).
+Formica is Kubernetes-native end-to-end. The same manifests work on a
+single box (via [k3d](https://k3d.io/)) and on a real EKS cluster.
+
+### Single GPU box (k3d)
+
+Canonical environment: a `g4dn.xlarge` launched from the prebaked
+open-weight AMI shared with `rome` (`ami-079c82d610e02e480`: AL2023 +
+NVIDIA drivers + CUDA + Docker + Mistral-7B-Instruct-v0.2-AWQ weights
+at `/opt/models/mistral-awq`).
 
 ```bash
 ssh ec2-user@<instance>
 git clone https://github.com/abacus2000/formica.git && cd formica
-docker compose -f deploy/compose/docker-compose.yml up -d   # neo4j + vllm
+
+k3d cluster create formica \
+  --gpus all \
+  --volume "/opt/models:/opt/models@all" \
+  --port "8080:8080@loadbalancer" \
+  --port "7474:7474@loadbalancer" \
+  --port "7687:7687@loadbalancer"
+kubectl apply -f \
+  https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.15.0/deployments/static/nvidia-device-plugin.yml
+kubectl apply -k deploy/k8s/overlays/dev
+kubectl -n formica rollout status deploy/vllm --timeout=15m
+
 pip install -e ".[dev]"
-formica solve "Prove sqrt(2) is irrational" --local --budget 1 --timeout 600
+kubectl -n formica port-forward svc/neo4j 7687:7687 &
+kubectl -n formica port-forward svc/vllm  8080:8080 &
+export FORMICA_NEO4J_URI=bolt://localhost:7687
+export FORMICA_MODEL_BASE_URL=http://localhost:8080/v1
+formica solve "Prove sqrt(2) is irrational" --budget 1 --timeout 600
 ```
 
-Full walk-through: [`docs/local-gpu-dev.md`](docs/local-gpu-dev.md).
+Full walk-through: [`docs/single-box.md`](docs/single-box.md).
 
-## Quick start (Kubernetes)
+### Multi-node (EKS)
+
+Same manifests, with a prod overlay that swaps the vLLM `hostPath` for
+a real PVC and sets IRSA annotations on the OTEL / Fluent Bit service
+accounts.
 
 ```bash
-kubectl apply -k deploy/k8s/overlays/dev
+kubectl apply -k deploy/k8s/overlays/prod
 formica solve "Prove sqrt(2) is irrational with three independent methods" \
-  --budget 2 --timeout 600 --env dev --region us-east-1
+  --budget 2 --timeout 600 --env prod --region us-east-1
 ```
 
 ## Observability
