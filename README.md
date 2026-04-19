@@ -34,13 +34,26 @@ See [`docs/port-notes.md`](docs/port-notes.md) for the full mapping.
 - **Capacity awareness** — spawn controller observes cluster headroom; never requests new compute;
   passively absorbs nodes added at runtime.
 
-## Quick start
+## Quick start (single GPU box)
+
+Formica ships configured for the open-weight GPU AMI shared with `rome`
+(`ami-079c82d610e02e480`: AL2023 + NVIDIA drivers + CUDA + Docker +
+Mistral-7B-Instruct-v0.2-AWQ weights at `/opt/models/mistral-awq`).
 
 ```bash
-# Deploy to an existing EKS cluster
-kubectl apply -k deploy/k8s/overlays/dev
+ssh ec2-user@<instance>
+git clone https://github.com/abacus2000/formica.git && cd formica
+docker compose -f deploy/compose/docker-compose.yml up -d   # neo4j + vllm
+pip install -e ".[dev]"
+formica solve "Prove sqrt(2) is irrational" --local --budget 1 --timeout 600
+```
 
-# Solve a problem
+Full walk-through: [`docs/local-gpu-dev.md`](docs/local-gpu-dev.md).
+
+## Quick start (Kubernetes)
+
+```bash
+kubectl apply -k deploy/k8s/overlays/dev
 formica solve "Prove sqrt(2) is irrational with three independent methods" \
   --budget 2 --timeout 600 --env dev --region us-east-1
 ```
