@@ -1,6 +1,6 @@
 apiVersion: v2
 name: formica
-description: Formica — stigmergic, ant-colony-inspired multi-agent system
+description: Formica - stigmergic, ant-colony-inspired multi-agent system
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

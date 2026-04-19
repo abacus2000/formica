@@ -36,6 +36,19 @@ neo4j:
   user: "neo4j"
   password: "changeme"
 
+# In-cluster vLLM (open-weight default, per ADR-0007).
+# Disable (vllm.enabled=false) when pointing model_base_url at an external
+# provider, e.g. Bedrock in prod. Single-box k3d users leave this on.
+vllm:
+  enabled: true
+  image: "vllm/vllm-openai:latest"
+  modelPath: "/models/mistral-awq"
+  servedModelName: "TheBloke/Mistral-7B-Instruct-v0.2-AWQ"
+  maxModelLen: 4096
+  gpuMemoryUtilization: 0.85
+  gpuCount: 1
+  hostModelsPath: "/opt/models"
+
 otel:
   endpoint: "http://otel-collector.formica.svc.cluster.local:4317"
   bucket: ""    # defaults to formica-otel-{env}-{region}

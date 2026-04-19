@@ -1,4 +1,4 @@
-"""Garbage collector caste (Lustrum) — necrophoresis.
+"""Garbage collector caste (Lustrum) - necrophoresis.
 
 Prunes nodes whose aggregate pheromone mass is below a floor, after their last
 update is older than a grace period.

@@ -28,9 +28,12 @@ def test_default_model_is_mistral_awq():
     assert cfg.model_id == "TheBloke/Mistral-7B-Instruct-v0.2-AWQ"
 
 
-def test_default_model_base_url_targets_local_vllm():
+def test_default_model_base_url_targets_in_cluster_vllm():
+    # In-cluster DNS: the `vllm` Service in the `formica` namespace.
+    # Out-of-cluster callers (e.g. the CLI on a laptop) should port-forward
+    # and override with FORMICA_MODEL_BASE_URL=http://localhost:8080/v1.
     cfg = FormicaConfig()
-    assert cfg.model_base_url == "http://localhost:8080/v1"
+    assert cfg.model_base_url == "http://vllm.formica.svc.cluster.local:8080/v1"
 
 
 def test_default_model_provider_speaks_openai_protocol():

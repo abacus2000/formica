@@ -1,4 +1,4 @@
-"""Capacity math — pool budgeting and headroom. Never provisions."""
+"""Capacity math - pool budgeting and headroom. Never provisions."""
 
 from formica.capacity.headroom import ClusterHeadroom, NodeSnapshot
 from formica.capacity.pools import Pool, budget
@@ -59,7 +59,7 @@ def test_passive_expansion_detected():
     added = _h([NodeSnapshot(name="new", allocatable_cpu_millis=2000,
                              allocatable_memory_bytes=4 * 1024**3)])
     b2 = budget(p, added, desired=4)
-    # The controller immediately uses the new headroom — no config change.
+    # The controller immediately uses the new headroom - no config change.
     assert b2.allowed_spawn > 0
 
 

@@ -1,0 +1,67 @@
+{{- if .Values.vllm.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/component: vllm
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: vllm
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: vllm
+    spec:
+      containers:
+        - name: vllm
+          image: {{ .Values.vllm.image }}
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--model={{ .Values.vllm.modelPath }}"
+            - "--served-model-name={{ .Values.vllm.servedModelName }}"
+            - "--quantization=awq"
+            - "--dtype=float16"
+            - "--max-model-len={{ .Values.vllm.maxModelLen }}"
+            - "--gpu-memory-utilization={{ .Values.vllm.gpuMemoryUtilization }}"
+            - "--host=0.0.0.0"
+            - "--port=8080"
+          ports:
+            - containerPort: 8080
+              name: http
+          resources:
+            limits:
+              nvidia.com/gpu: {{ .Values.vllm.gpuCount }}
+          volumeMounts:
+            - name: models
+              mountPath: /models
+              readOnly: true
+          readinessProbe:
+            httpGet: { path: /v1/models, port: 8080 }
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 60
+      volumes:
+        - name: models
+          hostPath:
+            path: {{ .Values.vllm.hostModelsPath }}
+            type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app.kubernetes.io/component: vllm
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+{{- end }}

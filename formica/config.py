@@ -20,16 +20,20 @@ class FormicaConfig(BaseSettings):
 
     # LLM model.
     #
-    # Formica defaults to the open-weight model that is pre-baked into the GPU
-    # AMI (shared with the rome project): Mistral-7B-Instruct-v0.2-AWQ, served
+    # Formica defaults to the open-weight model pre-baked into the GPU AMI
+    # (shared with the rome project): Mistral-7B-Instruct-v0.2-AWQ, served
     # by vLLM on :8080 with an OpenAI-compatible API. Weights live at
-    # /opt/models/mistral-awq on the AMI; the bundled docker-compose mounts
-    # that path into the vllm container read-only so nothing is downloaded at
-    # boot. See docs/local-gpu-dev.md and docs/decisions/0007-open-weight-default.md.
+    # /opt/models/mistral-awq on the AMI and are mounted into the vLLM pod
+    # read-only so nothing is downloaded at boot. See docs/single-box.md and
+    # docs/decisions/0007-open-weight-default.md.
+    #
+    # The default base_url targets in-cluster DNS (the `vllm` Service in the
+    # `formica` namespace). The CLI, when run from outside the cluster,
+    # should point to a port-forward: FORMICA_MODEL_BASE_URL=http://localhost:8080/v1
     #
     # To switch to another provider (e.g. Bedrock for prod) override with env:
     #   FORMICA_MODEL_PROVIDER=bedrock FORMICA_MODEL_ID=anthropic.claude-3-...
-    model_base_url: str = "http://localhost:8080/v1"
+    model_base_url: str = "http://vllm.formica.svc.cluster.local:8080/v1"
     model_id: str = "TheBloke/Mistral-7B-Instruct-v0.2-AWQ"
     model_provider: str = "openai"  # openai | ollama | bedrock
 

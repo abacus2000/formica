@@ -1,7 +1,7 @@
 name: gpu-smoke
 
 # Optional smoke test that exercises the AWS MCP exec tool against an
-# EXISTING GPU instance. This workflow MUST NOT provision capacity — it
+# EXISTING GPU instance. This workflow MUST NOT provision capacity - it
 # only runs `nvidia-smi` via SSM SendCommand on a pre-existing instance
 # whose ID is provided as a repo secret.
 #
@@ -29,7 +29,7 @@ jobs:
         shell: bash
         run: |
           if [[ -z "${{ secrets.FORMICA_GPU_INSTANCE_ID }}" ]]; then
-            echo "No FORMICA_GPU_INSTANCE_ID secret — skipping (expected in forks)."
+            echo "No FORMICA_GPU_INSTANCE_ID secret - skipping (expected in forks)."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"

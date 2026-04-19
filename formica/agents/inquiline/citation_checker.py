@@ -1,4 +1,4 @@
-"""Citation-checker inquiline — runs only on Evidence with `needs-expert` and sources."""
+"""Citation-checker inquiline - runs only on Evidence with `needs-expert` and sources."""
 
 from __future__ import annotations
 

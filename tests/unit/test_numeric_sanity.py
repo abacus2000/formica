@@ -1,4 +1,4 @@
-"""Numeric sanity inquiline — pure-Python path (no Neo4j)."""
+"""Numeric sanity inquiline - pure-Python path (no Neo4j)."""
 
 from formica.agents.inquiline.numeric_sanity import _EQ_RE, _check
 

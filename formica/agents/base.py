@@ -1,4 +1,4 @@
-"""Base Agent class — the tick loop.
+"""Base Agent class - the tick loop.
 
 Every caste runs: read_local_neighborhood → act → write_back, with OTEL spans
 emitted for every step.

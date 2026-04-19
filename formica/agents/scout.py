@@ -1,4 +1,4 @@
-"""Scout caste — decomposes an Objective or SubProblem into new SubProblems."""
+"""Scout caste - decomposes an Objective or SubProblem into new SubProblems."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ class Scout(Agent):
         if not parent_id or not parent_text:
             return AgentResult(action="scout.no-op", notes="no focus")
 
-        # LLM call is optional — a deterministic fallback lets us run without a model
+        # LLM call is optional - a deterministic fallback lets us run without a model
         # (e.g. unit tests, the toy math e2e).
         subproblem_texts = self._decompose(parent_text)
 
