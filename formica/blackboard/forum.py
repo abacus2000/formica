@@ -1,4 +1,4 @@
-"""The Forum — Neo4j-backed blackboard DAL.
+"""The Forum - Neo4j-backed blackboard DAL.
 
 Every agent interaction goes through this class. It is the only place in the
 codebase that should talk to Neo4j directly.

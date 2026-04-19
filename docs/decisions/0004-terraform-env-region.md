@@ -20,7 +20,7 @@ and IAM scoping keyed to `{env}` and `{region}`:
 - IAM roles: `formica-agent-{env}-{region}`, `formica-controller-{env}-{region}`,
   `formica-otel-{env}-{region}`, `formica-fluentbit-{env}-{region}`
 
-IAM policies use resource ARNs scoped to the env+region naming pattern only — no `*` resource wildcards.
+IAM policies use resource ARNs scoped to the env+region naming pattern only - no `*` resource wildcards.
 
 ## Consequences
 

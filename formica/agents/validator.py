@@ -1,4 +1,4 @@
-"""Validator caste (Censors) — verify Evidence nodes."""
+"""Validator caste (Censors) - verify Evidence nodes."""
 
 from __future__ import annotations
 

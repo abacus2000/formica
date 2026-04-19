@@ -19,7 +19,7 @@ These two paths executed *different code*. Path 1 skipped the
 controller entirely and drove Scouts/Foragers/Validators/GC inline from
 the CLI process. Path 2 was the real system. This created two
 maintenance burdens and, more importantly, meant single-box users were
-not exercising the code that runs in production — defeating the point
+not exercising the code that runs in production - defeating the point
 of single-box dev.
 
 The controller's use of Kubernetes (Jobs for agents, CoreV1 for node
@@ -28,7 +28,7 @@ single-node k3s cluster (via k3d) runs all of it unchanged: Jobs land
 on the one available node, `compute_headroom` reads that node's free
 CPU/mem, and `budget()` scales spawns against it. The only thing
 single-box mode actually needs that multi-node doesn't is a local vLLM
-with GPU access — and that's a `hostPath`-mounted Deployment, not a
+with GPU access - and that's a `hostPath`-mounted Deployment, not a
 reason to have a second runtime.
 
 ## Decision
@@ -55,7 +55,7 @@ reason to have a second runtime.
   collector by default).
 - **Keep Compose, delete `--local`.** Rejected: Compose without
   `--local` is just "two infra containers with no colony running,"
-  which is a footgun — users would `docker compose up` and see
+  which is a footgun - users would `docker compose up` and see
   nothing happen.
 - **Delete K8s, make Compose canonical.** Rejected: throws away the
   capacity-aware controller, per-agent resource isolation, RBAC, IRSA,

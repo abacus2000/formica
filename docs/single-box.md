@@ -1,8 +1,8 @@
 # Single-box Formica (k3d on a GPU EC2 instance)
 
 Formica runs the same Kubernetes manifests whether you have one node or
-fifty. For single-box development, we use [k3d](https://k3d.io/) — a
-lightweight k3s cluster that runs inside Docker on a single host — so
+fifty. For single-box development, we use [k3d](https://k3d.io/) - a
+lightweight k3s cluster that runs inside Docker on a single host - so
 you exercise the real controller / Job / Service / RBAC path on your
 laptop or on a single GPU EC2 box.
 
@@ -59,7 +59,7 @@ From outside the cluster (e.g. the EC2 instance's shell):
 ```bash
 pip install -e ".[dev]"
 
-# The CLI is a thin client — it writes to Neo4j and polls. The colony
+# The CLI is a thin client - it writes to Neo4j and polls. The colony
 # lives in the cluster. Port-forward Neo4j and vLLM so local env vars
 # Just Work.
 kubectl -n formica port-forward svc/neo4j 7687:7687 &
@@ -80,12 +80,12 @@ emit it.
 # Controller decisions (spawn/retire/phase transitions).
 kubectl -n formica logs -f deploy/formica-controller
 
-# Live pod list — scouts, foragers, validators, gc appear and disappear
+# Live pod list - scouts, foragers, validators, gc appear and disappear
 # as the controller reallocates roles.
 watch kubectl -n formica get pods
 
 # Neo4j browser (pheromones, subproblem graph).
-# neo4j / changeme  — override via deploy/k8s/base/neo4j.yaml for prod.
+# neo4j / changeme  - override via deploy/k8s/base/neo4j.yaml for prod.
 open http://localhost:7474
 ```
 
@@ -100,7 +100,7 @@ with the cluster, so this is a clean reset.
 
 ## From k3d to EKS
 
-The exact same manifests work on a real multi-node EKS cluster — that's
+The exact same manifests work on a real multi-node EKS cluster - that's
 the whole point. You only need to swap two things:
 
 1. **vLLM weights.** The `vllm.yaml` base manifest uses a `hostPath`

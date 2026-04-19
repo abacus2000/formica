@@ -1,4 +1,4 @@
-"""Numeric-sanity inquiline — checks arithmetic claims in Evidence content."""
+"""Numeric-sanity inquiline - checks arithmetic claims in Evidence content."""
 
 from __future__ import annotations
 

@@ -38,7 +38,7 @@ samples its next action by pheromone gradient, and writes pheromone back. Coordi
 | DuckDuckGo `web_search` / `web_fetch` | Same tools, carried over                          | Keep             | Moved to `formica/tools/web.py`. |
 | ATT&CK MCP server                 | *(pack-able, not included)*                           | Drop (for v0.1)  | Can be added as a pack later; not required for acceptance. |
 | AWS MCP tool for exec on GPU box  | `formica/tools/aws_exec.py`                           | Keep             | Executes commands on **existing** GPU instances only. No provisioning paths. |
-| *(new)*                           | **GC (Lustrum) caste**                                | Add              | Necrophoresis — prunes nodes whose all-channel pheromone is below threshold. |
+| *(new)*                           | **GC (Lustrum) caste**                                | Add              | Necrophoresis - prunes nodes whose all-channel pheromone is below threshold. |
 | *(new)*                           | **Alarm pheromone**                                   | Add              | Fast decay, wide radius; preempts work on hallucination/tool failure/budget overrun. |
 
 ## Stack decisions
@@ -46,20 +46,20 @@ samples its next action by pheromone gradient, and writes pheromone back. Coordi
 ### Kept
 - **Kubernetes** (EKS) as runtime. Minikube supported for local dev.
 - **Strands Agents** as the LLM agent primitive.
-- **Neo4j** as the graph store — promoted from an ATT&CK-pack optional to the core Forum.
+- **Neo4j** as the graph store - promoted from an ATT&CK-pack optional to the core Forum.
 - **AWS MCP tool** for executing commands on pre-existing GPU instances.
 - **Helm** (and Kustomize overlays) for deployment.
 
 ### Added
-- **OpenTelemetry Collector** (OTLP in, S3 Parquet out) — see ADR-0002.
-- **aws-for-fluent-bit** DaemonSet — see ADR-0003.
-- **Terraform** for cloud resources (S3, Glue, CloudWatch log groups, SNS, IAM) scoped by `{env}`/`{region}` — see ADR-0004.
-- **Click-based CLI** `formica solve ...` — see ADR-0005.
+- **OpenTelemetry Collector** (OTLP in, S3 Parquet out) - see ADR-0002.
+- **aws-for-fluent-bit** DaemonSet - see ADR-0003.
+- **Terraform** for cloud resources (S3, Glue, CloudWatch log groups, SNS, IAM) scoped by `{env}`/`{region}` - see ADR-0004.
+- **Click-based CLI** `formica solve ...` - see ADR-0005.
 
 ### Dropped
-- **Princeps service / Senate / Augur / Optio / Tribune** — replaced by emergent coordination (ADR-0001).
-- **Censor HTTP service + PVC** — replaced by OTEL + S3 (ADR-0002).
-- **Any GPU-capacity provisioning MCP** — explicitly excluded by constraint. Capacity is
+- **Princeps service / Senate / Augur / Optio / Tribune** - replaced by emergent coordination (ADR-0001).
+- **Censor HTTP service + PVC** - replaced by OTEL + S3 (ADR-0002).
+- **Any GPU-capacity provisioning MCP** - explicitly excluded by constraint. Capacity is
   observed, never requested (ADR-0006).
 
 ## Read order for maintainers

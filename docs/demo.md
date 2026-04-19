@@ -11,7 +11,7 @@ use `env=dev`, `region=us-east-1`.
 
 ---
 
-## Run 1 — Math: "Prove sqrt(2) is irrational"
+## Run 1 - Math: "Prove sqrt(2) is irrational"
 
 ### CLI
 
@@ -55,7 +55,7 @@ formica solve "Prove sqrt(2) is irrational. Present a classical proof." \
 ▸ tick 5  stable cycles: 3/3  ← converged
 ✓ validated answer (subtree o-3f1a.../contradiction approach):
     Assume sqrt(2) = p/q in lowest terms. Then 2q^2 = p^2, so p is even,
-    p = 2k, so q^2 = 2k^2, so q is even — contradicting lowest terms. ∎
+    p = 2k, so q^2 = 2k^2, so q is even - contradicting lowest terms. ∎
 spend: $0.41 / $2.00   wallclock: 84s / 600s
 ```
 
@@ -66,7 +66,7 @@ spend: $0.41 / $2.00   wallclock: 84s / 600s
 - **Driver logs (neo4j, strands, kubernetes, botocore, …):**
   [/formica/dev/us-east-1/drivers](https://console.aws.amazon.com/cloudwatch/home?region=us-east-1#logsV2:log-groups/log-group/$252Fformica$252Fdev$252Fus-east-1$252Fdrivers)
 
-### Athena query — pheromone history on the winning edge
+### Athena query - pheromone history on the winning edge
 
 ```sql
 SELECT ts, channel, value
@@ -88,7 +88,7 @@ Mock result:
 
 ---
 
-## Run 2 — Research: "Compare CNN vs ViT on ImageNet-1k (top-1)"
+## Run 2 - Research: "Compare CNN vs ViT on ImageNet-1k (top-1)"
 
 ### CLI
 
@@ -116,8 +116,8 @@ formica solve "Compare CNN vs ViT top-1 accuracy on ImageNet-1k with sources." \
 
 ```
 ✓ validated answer:
-  CNN (ConvNeXt-XL, IN-21k pretrain): 87.8% top-1 — [paper](https://…)
-  ViT  (ViT-H/14, JFT-300M pretrain): 88.55% top-1 — [paper](https://…)
+  CNN (ConvNeXt-XL, IN-21k pretrain): 87.8% top-1 - [paper](https://…)
+  ViT  (ViT-H/14, JFT-300M pretrain): 88.55% top-1 - [paper](https://…)
   Gap: ≈0.75 pp in favour of ViT at equivalent pretrain scale.
 spend: $1.22 / $3.00  wallclock: 312s / 900s
 ```
@@ -160,4 +160,4 @@ alarm, no new pods are created, and no AWS provisioning API is called
 (verified by the `ci.yml → No provisioning APIs` grep step and by CloudTrail).
 
 When you uncordon a node, the Controller picks up the new capacity on
-its next 10s tick — no restart, no config change.
+its next 10s tick - no restart, no config change.

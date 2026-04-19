@@ -1,4 +1,4 @@
-"""Forager caste — picks a SubProblem by gradient, produces Evidence."""
+"""Forager caste - picks a SubProblem by gradient, produces Evidence."""
 
 from __future__ import annotations
 
@@ -107,7 +107,7 @@ class Forager(Agent):
             return (resp.get("content") or "").strip(), list(resp.get("sources") or [])
         except Exception:
             # Deterministic fallback for tests.
-            return (f"Observation: {task_text} — preliminary analysis.", [])
+            return (f"Observation: {task_text} - preliminary analysis.", [])
 
 
 def _has_label(node: dict, label: str) -> bool:

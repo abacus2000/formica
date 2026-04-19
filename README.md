@@ -1,81 +1,153 @@
 # Formica
 
-**Formica** is a stigmergic, ant-colony-inspired multi-agent system for autonomous problem solving.
-It is the spiritual successor to [`abacus2000/rome`](https://github.com/abacus2000/rome): same stack
-(Kubernetes, Strands Agents, Neo4j, AWS), but the coordination model is replaced with stigmergy — agents
-coordinate by reading and writing a shared artifact (a typed task graph with pheromone-weighted edges),
-not by messaging each other.
+**Formica** is a stigmergic, ant-colony-inspired multi-agent system for
+autonomous problem solving. Agents do not message each other. They
+coordinate by reading and writing a shared artifact: a typed task
+graph with pheromone-weighted edges, stored in Neo4j.
 
 > "Intelligence is a property of the colony, not the ant."
 
-## What's different from Rome
+## What is Formica
 
-| Rome                                   | Formica                                               |
-| -------------------------------------- | ----------------------------------------------------- |
-| Princeps decides deployment (hierarchy) | No dispatcher. Workers follow pheromone gradients.    |
-| Legion / Civitas (direct / deliberative) | Single worker pool with role reallocation (Gordon).  |
-| Censor as metrics sink                  | Validator caste emits `validated` pheromone.          |
-| Inter-service HTTP messaging            | All coordination via the **Forum** (Neo4j blackboard).|
-| Kaizen agents propose changes          | Phase cycling + `anternet`-style spawn feedback.      |
-| Capacity provisioning                  | **Never provisions**. Capacity-aware, passive growth. |
+- **Forum (blackboard).** Neo4j graph of sub-problems, partial
+  solutions, evidence, and validations. This is the only coordination
+  channel. No inter-agent HTTP.
+- **Pheromones.** Per-edge scalars across six channels (`promising`,
+  `validated`, `risky`, `needs-expert`, `dead-end`, `alarm`), each
+  with its own evaporation half-life. Agents follow gradients.
+- **Castes.** Scouts decompose problems. Foragers produce evidence.
+  Validators judge it. A GC caste prunes stale branches. Inquilines
+  are narrow specialists (citation checking, numeric sanity).
+- **Role reallocation (Gordon's rule).** Agents re-specialize based on
+  local encounter rates, so the colony rebalances without a central
+  scheduler.
+- **Phase cycling.** The colony alternates exploration and
+  consolidation phases based on pheromone entropy.
+- **Alarm propagation.** Fast, short-lived pheromone that preempts
+  work on failure or hallucination.
+- **Capacity awareness, never provisioning.** The spawn controller
+  observes cluster headroom each tick and schedules within it. It
+  never requests new compute. Nodes added at runtime are absorbed
+  passively on the next tick.
 
-See [`docs/port-notes.md`](docs/port-notes.md) for the full mapping.
+### Architecture
 
-## Core ideas
+```mermaid
+flowchart LR
+    CLI["formica solve<br/>(thin client)"]
 
-- **Forum (blackboard)** — Neo4j graph of sub-problems, partial solutions, evidence, validations.
-- **Pheromones** — per-edge scalars across six channels (`promising`, `validated`, `risky`,
-  `needs-expert`, `dead-end`, `alarm`), each with its own evaporation half-life.
-- **Castes** — Scouts, Foragers, Validators (Censors), GC (Lustrum), and narrow Inquilines.
-- **Role reallocation (Gordon's rule)** — agents re-specialize based on local encounter rates.
-- **Phase cycling** — colony alternates exploration and consolidation based on pheromone entropy.
-- **Necrophoresis** — a GC caste prunes stale / decayed branches.
-- **Alarm propagation** — fast, short-lived pheromone that preempts work on failure / hallucination.
-- **Capacity awareness** — spawn controller observes cluster headroom; never requests new compute;
-  passively absorbs nodes added at runtime.
+    subgraph cluster["Kubernetes cluster (k3d or EKS)"]
+        direction TB
 
-## Quick start
+        CTRL["Controller<br/>capacity-aware<br/>spawn / retire"]
+
+        subgraph castes["Agent castes (Jobs)"]
+            direction TB
+            SC["Scout"]
+            FO["Forager"]
+            VA["Validator"]
+            GC["GC"]
+            INQ["Inquilines"]
+        end
+
+        NEO[("Forum<br/>Neo4j: task graph<br/>+ pheromones")]
+        VLLM["vLLM<br/>OpenAI-compatible"]
+    end
+
+    subgraph aws["AWS (observability)"]
+        direction TB
+        CW[("CloudWatch<br/>errors + drivers")]
+        S3[("S3 + Athena<br/>OTEL Parquet")]
+    end
+
+    CLI -->|write Objective / poll| NEO
+
+    CTRL -->|spawns / retires<br/>within headroom| castes
+
+    castes <-->|read / write| NEO
+    castes -->|LLM calls| VLLM
+
+    castes -.->|OTEL| S3
+    castes -.->|logs| CW
+```
+
+Agents never talk to each other. Every arrow into or out of the
+colony goes through the Forum (Neo4j) or the model server. The
+controller's only job is to keep the right mix of pods running
+within whatever cluster headroom happens to exist.
+
+## Launch
 
 Formica is Kubernetes-native end-to-end. The same manifests work on a
 single box (via [k3d](https://k3d.io/)) and on a real EKS cluster.
+There is no separate Docker Compose stack and no in-process mode.
 
-### Single GPU box (k3d)
+### Prerequisites
 
-Canonical environment: a `g4dn.xlarge` launched from the prebaked
-open-weight AMI shared with `rome` (`ami-079c82d610e02e480`: AL2023 +
-NVIDIA drivers + CUDA + Docker + Mistral-7B-Instruct-v0.2-AWQ weights
-at `/opt/models/mistral-awq`).
+- Docker, `kubectl`, `kustomize`, and `k3d` on your PATH.
+- For local GPU inference: an NVIDIA GPU with drivers and
+  `nvidia-container-toolkit` installed, plus Mistral-7B-AWQ weights at
+  `/opt/models/mistral-awq` on the host. (Skip this if you override to
+  Bedrock or OpenAI via `FORMICA_MODEL_PROVIDER`.)
+- For AWS observability: valid AWS credentials in the shell that runs
+  `kubectl apply` (IRSA handles pod-level auth once deployed).
+
+### 1. Create a single-node GPU cluster
 
 ```bash
-ssh ec2-user@<instance>
-git clone https://github.com/abacus2000/formica.git && cd formica
-
 k3d cluster create formica \
   --gpus all \
   --volume "/opt/models:/opt/models@all" \
   --port "8080:8080@loadbalancer" \
   --port "7474:7474@loadbalancer" \
   --port "7687:7687@loadbalancer"
+
 kubectl apply -f \
   https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.15.0/deployments/static/nvidia-device-plugin.yml
+```
+
+### 2. Deploy Formica
+
+```bash
+git clone https://github.com/abacus2000/formica.git && cd formica
 kubectl apply -k deploy/k8s/overlays/dev
 kubectl -n formica rollout status deploy/vllm --timeout=15m
+```
 
+The `vllm` rollout is the slow one (60-120s on the prebaked GPU AMI,
+up to 15 minutes if weights are downloaded from HuggingFace). The
+controller, Neo4j, and OTEL collector come up in seconds.
+
+### 3. Submit an objective
+
+```bash
 pip install -e ".[dev]"
+
+# Port-forward Neo4j and vLLM so the CLI can reach them from outside
+# the cluster.
 kubectl -n formica port-forward svc/neo4j 7687:7687 &
 kubectl -n formica port-forward svc/vllm  8080:8080 &
+
 export FORMICA_NEO4J_URI=bolt://localhost:7687
 export FORMICA_MODEL_BASE_URL=http://localhost:8080/v1
+
 formica solve "Prove sqrt(2) is irrational" --budget 1 --timeout 600
 ```
 
-Full walk-through: [`docs/single-box.md`](docs/single-box.md).
+Validated Evidence streams to stdout as Validator pods emit it.
+
+### Watch the colony
+
+```bash
+kubectl -n formica logs -f deploy/formica-controller   # spawn/retire decisions
+watch kubectl -n formica get pods                       # live caste mix
+open http://localhost:7474                              # Neo4j browser
+```
 
 ### Multi-node (EKS)
 
 Same manifests, with a prod overlay that swaps the vLLM `hostPath` for
-a real PVC and sets IRSA annotations on the OTEL / Fluent Bit service
-accounts.
+a PVC and sets IRSA annotations:
 
 ```bash
 kubectl apply -k deploy/k8s/overlays/prod
@@ -83,24 +155,16 @@ formica solve "Prove sqrt(2) is irrational with three independent methods" \
   --budget 2 --timeout 600 --env prod --region us-east-1
 ```
 
+Full walkthrough: [`docs/single-box.md`](docs/single-box.md).
+
 ## Observability
 
-- **CloudWatch** (errors + driver logs): `/formica/{env}/{region}/errors`, `/formica/{env}/{region}/drivers`
-- **S3 + Athena** (OTEL traces/metrics/logs as Parquet): `formica-otel-{env}-{region}`
+- **CloudWatch** (errors + driver logs):
+  `/formica/{env}/{region}/errors`, `/formica/{env}/{region}/drivers`
+- **S3 + Athena** (OTEL traces / metrics / logs as Parquet):
+  `formica-otel-{env}-{region}`
 
 See [`docs/observability.md`](docs/observability.md).
-
-## Roman aliases
-
-Formica's canonical vocabulary is ant-colony. Roman terms are available as readability aliases:
-
-| Formica (canonical) | Rome alias |
-| ------------------- | ---------- |
-| agent pod           | Castra     |
-| trail               | Via        |
-| validator           | Censor     |
-| GC pass             | Lustrum    |
-| blackboard          | Forum      |
 
 ## License
 

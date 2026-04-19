@@ -39,11 +39,11 @@ flowchart TB
 
 Neo4j graph. Node labels:
 
-- `:Objective` — the top-level problem. One per `formica solve` invocation.
-- `:SubProblem` — a decomposition; created by Scouts.
-- `:Evidence` — a partial solution, quote, computation, or claim; written by Foragers.
-- `:Validation` — a verdict on an Evidence node; written by Validators.
-- `:Alarm` — a transient event (hallucination, tool failure, budget overrun).
+- `:Objective` - the top-level problem. One per `formica solve` invocation.
+- `:SubProblem` - a decomposition; created by Scouts.
+- `:Evidence` - a partial solution, quote, computation, or claim; written by Foragers.
+- `:Validation` - a verdict on an Evidence node; written by Validators.
+- `:Alarm` - a transient event (hallucination, tool failure, budget overrun).
 
 Edge types:
 
@@ -86,7 +86,7 @@ Agents are **stateless between ticks**. Everything durable goes to the Forum.
 | Scout           | Creates new `SubProblem` nodes from unclaimed objectives; seeds `promising` | new nodes + edges |
 | Forager         | Picks a `SubProblem` by gradient; produces `Evidence` | `Evidence`, `SUPPORTS` with `promising`    |
 | Validator       | Verifies `Evidence` (unit test, consistency, citation) | `Validation` with `validated` or `dead-end` |
-| Inquiline       | Narrow specialist — runs only when `needs-expert` or a specific pattern matches | depends                                    |
+| Inquiline       | Narrow specialist - runs only when `needs-expert` or a specific pattern matches | depends                                    |
 | GC (Lustrum)    | Prunes nodes whose all-channel pheromone sum is below threshold for N cycles | deletes                                  |
 
 ## Phase cycling

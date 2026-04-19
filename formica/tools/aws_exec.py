@@ -1,4 +1,4 @@
-"""AWS MCP exec tool — run commands on **existing** EC2/GPU instances only.
+"""AWS MCP exec tool - run commands on **existing** EC2/GPU instances only.
 
 This tool must NEVER provision new instances. It only runs shell commands on
 instances that already exist in the account. SSM `SendCommand` is the transport.
