@@ -7,8 +7,10 @@ resources:
   - neo4j.yaml
   - controller.yaml
   - evaporation-cron.yaml
-  - ../../otel-collector/collector.yaml
-  - ../../fluent-bit/fluent-bit.yaml
+  - ../../otel-collector
+  - ../../fluent-bit
 
-commonLabels:
-  app.kubernetes.io/instance: formica
+labels:
+  - pairs:
+      app.kubernetes.io/instance: formica
+    includeSelectors: true
