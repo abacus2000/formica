@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: formica-controller
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "formica.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controller
+spec:
+  replicas: {{ .Values.controller.replicas }}
+  strategy: { type: Recreate }
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: controller
+  template:
+    metadata:
+      labels:
+        {{- include "formica.labels" . | nindent 8 }}
+        app.kubernetes.io/component: controller
+    spec:
+      serviceAccountName: formica-controller
+      containers:
+        - name: controller
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["python", "-m", "formica.coordinator.main"]
+          env:
+            - { name: FORMICA_COMPONENT, value: "controller" }
+            - { name: FORMICA_ENV, value: {{ .Values.env | quote }} }
+            - { name: FORMICA_REGION, value: {{ .Values.region | quote }} }
+            - { name: FORMICA_NEO4J_URI, value: {{ .Values.neo4j.uri | quote }} }
+            - { name: FORMICA_NEO4J_USER, value: {{ .Values.neo4j.user | quote }} }
+            - name: FORMICA_NEO4J_PASSWORD
+              valueFrom: { secretKeyRef: { name: neo4j-auth, key: NEO4J_PASSWORD } }
+            - { name: FORMICA_OTLP_ENDPOINT, value: {{ .Values.otel.endpoint | quote }} }
+            - { name: FORMICA_CAPACITY_TICK_SECONDS, value: {{ .Values.controller.capacityTickSeconds | quote }} }
+            - { name: FORMICA_PENDING_BACKPRESSURE, value: {{ .Values.controller.pendingBackpressure | quote }} }
+          resources:
+            {{- toYaml .Values.controller.resources | nindent 12 }}

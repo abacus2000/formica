@@ -1,0 +1,69 @@
+{{- /*
+Pheromone evaporation CronJobs.
+
+- formica-evaporation: full pass every minute, uses the global
+  MIN_PHEROMONE = 1e-4 threshold.
+- formica-alarm-evaporation: shorter half-life alarm channel (30s)
+  needs more aggressive pruning; we sweep with a higher floor.
+*/ -}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: formica-evaporation
+  namespace: {{ .Values.namespace }}
+  labels: {{- include "formica.labels" . | nindent 4 }}
+spec:
+  schedule: "* * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/component: evaporation
+            {{- include "formica.labels" . | nindent 12 }}
+        spec:
+          serviceAccountName: formica-controller
+          restartPolicy: OnFailure
+          containers:
+            - name: evaporate
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command: ["python", "-m", "formica.cli", "evaporate"]
+              env:
+                - { name: FORMICA_ENV,    value: {{ .Values.env    | quote }} }
+                - { name: FORMICA_REGION, value: {{ .Values.region | quote }} }
+                - { name: FORMICA_NEO4J_URI, value: {{ .Values.neo4j.uri | quote }} }
+                - name: FORMICA_NEO4J_PASSWORD
+                  valueFrom: { secretKeyRef: { name: neo4j-auth, key: NEO4J_PASSWORD } }
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: formica-alarm-evaporation
+  namespace: {{ .Values.namespace }}
+  labels: {{- include "formica.labels" . | nindent 4 }}
+spec:
+  schedule: "*/1 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/component: evaporation-alarm
+            {{- include "formica.labels" . | nindent 12 }}
+        spec:
+          serviceAccountName: formica-controller
+          restartPolicy: OnFailure
+          containers:
+            - name: evaporate-alarm
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command: ["python", "-m", "formica.cli", "evaporate", "--min-pheromone", "0.01"]
+              env:
+                - { name: FORMICA_ENV,    value: {{ .Values.env    | quote }} }
+                - { name: FORMICA_REGION, value: {{ .Values.region | quote }} }
+                - { name: FORMICA_NEO4J_URI, value: {{ .Values.neo4j.uri | quote }} }
+                - name: FORMICA_NEO4J_PASSWORD
+                  valueFrom: { secretKeyRef: { name: neo4j-auth, key: NEO4J_PASSWORD } }

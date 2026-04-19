@@ -1,0 +1,73 @@
+{{- /*
+Neo4j StatefulSet + headless Service for the blackboard (Forum).
+Single replica by design — the colony's blackboard is authoritative
+state, not a horizontally-scaled cache.
+*/ -}}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: neo4j-auth
+  namespace: {{ .Values.namespace }}
+  labels: {{- include "formica.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  NEO4J_AUTH: "{{ .Values.neo4j.user }}/{{ .Values.neo4j.password }}"
+  NEO4J_USER: {{ .Values.neo4j.user | quote }}
+  NEO4J_PASSWORD: {{ .Values.neo4j.password | quote }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: neo4j
+  namespace: {{ .Values.namespace }}
+  labels: {{- include "formica.labels" . | nindent 4 }}
+spec:
+  serviceName: neo4j
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: neo4j
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: neo4j
+        {{- include "formica.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: neo4j
+          image: neo4j:5.26.24-community
+          ports:
+            - { containerPort: 7474, name: http }
+            - { containerPort: 7687, name: bolt }
+          env:
+            - name: NEO4J_AUTH
+              valueFrom:
+                secretKeyRef: { name: neo4j-auth, key: NEO4J_AUTH }
+            - name: NEO4J_PLUGINS
+              value: '["apoc"]'
+            - name: NEO4J_dbms_security_procedures_unrestricted
+              value: "apoc.*"
+          volumeMounts:
+            - { name: data, mountPath: /data }
+          resources:
+            requests: { cpu: "500m", memory: "1Gi" }
+            limits:   { cpu: "1",    memory: "2Gi" }
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests: { storage: 5Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: neo4j
+  namespace: {{ .Values.namespace }}
+  labels: {{- include "formica.labels" . | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/component: neo4j
+  ports:
+    - { name: http, port: 7474, targetPort: 7474 }
+    - { name: bolt, port: 7687, targetPort: 7687 }

@@ -1,0 +1,53 @@
+env: dev
+region: us-east-1
+namespace: formica
+
+image:
+  repository: formica
+  tag: latest
+  pullPolicy: IfNotPresent
+
+controller:
+  replicas: 1
+  resources:
+    requests: { cpu: "100m", memory: "128Mi" }
+    limits:   { cpu: "500m", memory: "512Mi" }
+  capacityTickSeconds: 10
+  pendingBackpressure: 5
+
+pools:
+  scout:        { min: 1, max: 4,  cpu: "250m", memory: "256Mi" }
+  forager:      { min: 2, max: 16, cpu: "250m", memory: "256Mi" }
+  validator:    { min: 1, max: 8,  cpu: "250m", memory: "256Mi" }
+  gc:           { min: 0, max: 2,  cpu: "100m", memory: "128Mi" }
+  inquilineCitation: { min: 0, max: 4, cpu: "100m", memory: "128Mi" }
+  inquilineNumeric:  { min: 0, max: 4, cpu: "100m", memory: "128Mi" }
+
+pheromones:
+  promisingHalfLifeSeconds: 900
+  validatedHalfLifeSeconds: 3600
+  alarmHalfLifeSeconds: 30
+  minPheromone: 0.0001
+  validatedThreshold: 0.7
+  nStableCycles: 3
+
+neo4j:
+  uri: "bolt://neo4j.formica.svc.cluster.local:7687"
+  user: "neo4j"
+  password: "changeme"
+
+otel:
+  endpoint: "http://otel-collector.formica.svc.cluster.local:4317"
+  bucket: ""    # defaults to formica-otel-{env}-{region}
+  # IRSA annotation, set via overlay; e.g. { eks.amazonaws.com/role-arn: "arn:aws:iam::...:role/formica-otel-dev-us-east-1" }
+  serviceAccountAnnotations: {}
+
+fluentBit:
+  # IRSA annotation, set via overlay; e.g. { eks.amazonaws.com/role-arn: "arn:aws:iam::...:role/formica-fluent-bit-dev-us-east-1" }
+  serviceAccountAnnotations: {}
+
+cloudwatch:
+  errorsGroup: ""    # defaults to /formica/{env}/{region}/errors
+  driversGroup: ""   # defaults to /formica/{env}/{region}/drivers
+  retentionDaysDev: 30
+  retentionDaysProd: 180
