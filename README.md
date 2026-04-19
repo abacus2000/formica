@@ -166,6 +166,29 @@ Full walkthrough: [`docs/single-box.md`](docs/single-box.md).
 
 See [`docs/observability.md`](docs/observability.md).
 
+## Credits and inspiration
+
+Formica's design draws on peer-reviewed work in multi-agent systems,
+distributed algorithms, and ant colony biology. The annotated reading
+list - with notes on which paper shaped which component - lives in
+[`docs/references.md`](docs/references.md).
+
+A few load-bearing sources:
+
+- Rodriguez 2026, *Pressure Fields and Temporal Decay* - the core
+  coordination model behind Formica's pheromone grid and decay.
+- Garg, Shiragur, Gordon, Charikar 2023, *Distributed algorithms from
+  arboreal ants* - shortest-path reinforcement on the evidence graph.
+- Chandrasekhar, Gordon, Navlakha 2018, *Trail repair* - how the
+  colony recovers after a pod is retired or a Validator fails.
+- Prabhakar, Dektar, Gordon 2012, *Anternet* - outgoing-rate control
+  tuned by return signals; Formica's Controller spawns new Workers by
+  the same rule.
+- Gordon & Mehdiabadi 1999, *Encounter rate and task allocation* -
+  the local-interaction basis for Gordon's rule in the Controller.
+- Friedman et al 2021, *Active Inferants* - active-inference framing
+  for individual agents inside a stigmergic colony.
+
 ## License
 
 [MIT](LICENSE)
