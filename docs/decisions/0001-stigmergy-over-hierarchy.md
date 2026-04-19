@@ -19,7 +19,7 @@ an action by pheromone gradient, and write pheromone back. No inter-agent chat c
 
 - **+** No single point of coordination. The colony throughput scales with worker count and
   Neo4j write throughput, not with a manager's LLM latency.
-- **+** Emergent specialization via Gordon's rule — no need to pre-classify work as
+- **+** Emergent specialization via Gordon's rule - no need to pre-classify work as
   "legion" or "civitas".
 - **+** Failure is local. A dead worker leaves stale pheromone that evaporates; no
   orphan-reconciliation logic needed.

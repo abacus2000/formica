@@ -1,6 +1,6 @@
 {{- /*
 Neo4j StatefulSet + headless Service for the blackboard (Forum).
-Single replica by design — the colony's blackboard is authoritative
+Single replica by design - the colony's blackboard is authoritative
 state, not a horizontally-scaled cache.
 */ -}}
 apiVersion: v1

@@ -25,7 +25,7 @@ log = get_logger(__name__)
 
 @click.group()
 def main() -> None:
-    """Formica — stigmergic multi-agent problem solving."""
+    """Formica - stigmergic multi-agent problem solving."""
 
 
 @main.command()
@@ -41,8 +41,8 @@ def solve(problem: str, budget: float, timeout: int, env: str, region: str,
     """Submit an Objective to the Forum and wait for validated Evidence.
 
     The CLI is a thin client: it writes the Objective to the Forum (Neo4j)
-    and polls for validated Evidence. The actual colony — controller,
-    scouts, foragers, validators, GC — runs as Kubernetes workloads.
+    and polls for validated Evidence. The actual colony - controller,
+    scouts, foragers, validators, GC - runs as Kubernetes workloads.
     For single-box use, bring up a k3d cluster (see docs/single-box.md);
     the same manifests then work unchanged on a real EKS cluster.
     """

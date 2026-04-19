@@ -29,7 +29,7 @@ Formica defaults to the same open-weight model, served the same way:
   `FORMICA_MODEL_BASE_URL=http://localhost:8080/v1`.
 - `FormicaConfig.model_id` defaults to `TheBloke/Mistral-7B-Instruct-v0.2-AWQ`.
 - `FormicaConfig.model_provider` defaults to `openai` (the provider
-  protocol, not the vendor — vLLM speaks it natively).
+  protocol, not the vendor - vLLM speaks it natively).
 - vLLM ships as an in-cluster `Deployment` + `Service`
   (`deploy/k8s/base/vllm.yaml`) with weights bind-mounted via
   `hostPath` on single-box clusters; swap for a PVC in EKS overlays.

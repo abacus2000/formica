@@ -1,4 +1,4 @@
-# ADR-0006: No capacity provisioning — ever
+# ADR-0006: No capacity provisioning - ever
 
 **Status**: Accepted (constraint)
 **Date**: 2026-04-19
@@ -19,13 +19,13 @@ Run-Instances, no Karpenter triggers, no GPU-capacity MCP. The spawn/retire cont
 2. Respects per-pool budgets derived from headroom.
 3. If headroom is insufficient: throttles spawn rate, promotes lower-priority agents
    to retirement, or emits `alarm` pheromone. Never escalates outward.
-4. Detects newly added nodes (human action or external autoscaler) passively —
+4. Detects newly added nodes (human action or external autoscaler) passively -
    on the next tick, headroom increases and spawns resume with no config change.
 
 ## Consequences
 
 - **+** Predictable cost ceiling per cluster.
-- **+** Playing nicely with existing autoscaler strategies (Karpenter, CA) — the
+- **+** Playing nicely with existing autoscaler strategies (Karpenter, CA) - the
   controller is agnostic to how nodes arrive.
 - **−** Users must size the cluster for peak load or accept back-pressure.
 

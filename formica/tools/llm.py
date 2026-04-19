@@ -1,4 +1,4 @@
-"""Strands agent wrapper used by castes — returns parsed JSON."""
+"""Strands agent wrapper used by castes - returns parsed JSON."""
 
 from __future__ import annotations
 

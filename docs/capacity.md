@@ -24,7 +24,7 @@ Each pool has:
 
 - `min_replicas`, `max_replicas` (hard caps from Helm values)
 - `priority` (used to break ties under pressure)
-- `headroom_quota` — fraction of remaining cluster headroom this pool may use
+- `headroom_quota` - fraction of remaining cluster headroom this pool may use
 
 On each tick:
 
@@ -69,4 +69,4 @@ config change.
 - `ec2:RunInstances` is not in any Formica IAM policy.
 - CI runs `grep -RIn "run_instances\|eks:UpdateNodegroup" formica/` and fails if any hits.
 - The controller's unit tests include a case where the Kubernetes API is mocked to
-  report zero headroom — the expected behavior is throttle + alarm, not any outbound call.
+  report zero headroom - the expected behavior is throttle + alarm, not any outbound call.

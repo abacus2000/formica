@@ -1,7 +1,7 @@
 """Container entrypoint for caste pods.
 
 Reads FORMICA_COMPONENT to pick the caste and runs a bounded number of ticks.
-Short-lived by design — the controller spawns replacements.
+Short-lived by design - the controller spawns replacements.
 """
 
 from __future__ import annotations

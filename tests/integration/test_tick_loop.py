@@ -15,7 +15,7 @@ from formica.config import FormicaConfig
 
 
 class FakeForum:
-    """In-memory Forum — enough of the API for the tick loop."""
+    """In-memory Forum - enough of the API for the tick loop."""
 
     def __init__(self):
         self.nodes: dict[str, dict] = {}

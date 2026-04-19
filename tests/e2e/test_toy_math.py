@@ -1,4 +1,4 @@
-"""End-to-end style test — drives a toy math problem through the tick loop
+"""End-to-end style test - drives a toy math problem through the tick loop
 against the in-memory FakeForum. Verifies that:
 
   1. Scouts decompose the objective.
@@ -39,7 +39,7 @@ def test_toy_math_converges(monkeypatch):
     evs = [n for n in forum.nodes.values() if "Evidence" in n["_labels"]]
     assert len(evs) == len(subs)
 
-    # 3) Validator verdicts — force `validated` by monkeypatching _judge.
+    # 3) Validator verdicts - force `validated` by monkeypatching _judge.
     def _always_validate(self, content, sources):
         return "validated", 0.95, "forced-pass for test"
 

@@ -1,4 +1,4 @@
-"""The Forum — Neo4j blackboard DAL."""
+"""The Forum - Neo4j blackboard DAL."""
 
 from formica.blackboard.forum import Forum
 from formica.blackboard.models import (

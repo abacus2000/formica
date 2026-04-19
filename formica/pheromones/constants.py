@@ -16,7 +16,7 @@ class PheromoneChannel(str, Enum):
 
 CHANNELS = tuple(c.value for c in PheromoneChannel)
 
-# Half-lives (seconds) — override in production via env vars or Helm.
+# Half-lives (seconds) - override in production via env vars or Helm.
 DEFAULT_HALF_LIFE: dict[str, int] = {
     PheromoneChannel.PROMISING.value: 15 * 60,
     PheromoneChannel.VALIDATED.value: 60 * 60,
