@@ -144,14 +144,28 @@ if ! command -v buildctl >/dev/null; then
 fi
 
 if ! pgrep -x buildkitd >/dev/null; then
-  sudo nohup /usr/local/bin/buildkitd \
+  # Redirect must be inside the sudo'd shell or it runs as the calling user
+  # and fails with Permission denied on /var/log/.
+  sudo sh -c 'nohup /usr/local/bin/buildkitd \
     --oci-worker=false \
     --containerd-worker=true \
     --containerd-worker-addr=/run/k3s/containerd/containerd.sock \
     --containerd-worker-namespace=k8s.io \
-    >/var/log/buildkitd.log 2>&1 &
-  sleep 4
+    >/var/log/buildkitd.log 2>&1 &'
+  # Wait for the socket to appear; bail if buildkitd died.
+  for i in {1..20}; do
+    if [[ -S /run/buildkit/buildkitd.sock ]]; then break; fi
+    sleep 1
+  done
+  if [[ ! -S /run/buildkit/buildkitd.sock ]]; then
+    echo "buildkitd failed to start. Last 40 lines of /var/log/buildkitd.log:"
+    sudo tail -40 /var/log/buildkitd.log || true
+    exit 1
+  fi
 fi
+
+note "Verifying buildkitd worker is reachable..."
+sudo /usr/local/bin/buildctl debug workers >/dev/null
 
 note "Building formica:latest (this pulls the base image on first run)..."
 sudo /usr/local/bin/buildctl build \
