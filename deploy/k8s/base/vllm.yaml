@@ -1,10 +1,11 @@
 ---
 # vLLM model server. OpenAI-compatible API on :8080.
 #
-# Single-box (k3d on the prebaked GPU AMI): weights are bind-mounted from the
-# host at /opt/models/mistral-awq via a hostPath volume. The GPU is exposed to
-# the pod via the nvidia device plugin (DaemonSet installed by k3d-gpu or the
-# NVIDIA GPU Operator).
+# Single-box (bare k3s on the prebaked GPU AMI): weights are bind-mounted from
+# the host at /opt/models/mistral-awq via a hostPath volume. The GPU is exposed
+# to the pod via the NVIDIA device plugin daemonset. The pod runs under the
+# `nvidia` RuntimeClass so containerd launches it with nvidia-container-runtime,
+# which injects /dev/nvidia*, libraries, and CUDA driver into the container.
 #
 # Multi-node (EKS): replace the hostPath volume with a PVC backed by a model
 # cache (e.g. EFS or an initContainer that rsyncs from S3). The Service name
@@ -27,6 +28,7 @@ spec:
       labels:
         app.kubernetes.io/component: vllm
     spec:
+      runtimeClassName: nvidia
       containers:
         - name: vllm
           image: vllm/vllm-openai:latest

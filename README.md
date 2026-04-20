@@ -38,7 +38,7 @@ graph with pheromone-weighted edges, stored in Neo4j.
 flowchart LR
     CLI["formica solve<br/>(thin client)"]
 
-    subgraph cluster["Kubernetes cluster (k3d or EKS)"]
+    subgraph cluster["Kubernetes cluster (k3s or EKS)"]
         direction TB
 
         CTRL["Controller<br/>capacity-aware<br/>spawn / retire"]
@@ -81,12 +81,13 @@ within whatever cluster headroom happens to exist.
 ## Launch
 
 Formica is Kubernetes-native end-to-end. The same manifests work on a
-single box (via [k3d](https://k3d.io/)) and on a real EKS cluster.
-There is no separate Docker Compose stack and no in-process mode.
+single box (bare [k3s](https://k3s.io/) installed as a systemd service)
+and on a real EKS cluster. There is no separate Docker Compose stack,
+no Docker-in-the-middle, and no in-process mode.
 
 ### Prerequisites
 
-- Docker, `kubectl`, `kustomize`, and `k3d` on your PATH.
+- `curl`, `systemd`, and root access to install k3s.
 - For local GPU inference: an NVIDIA GPU with drivers and
   `nvidia-container-toolkit` installed, plus Mistral-7B-AWQ weights at
   `/opt/models/mistral-awq` on the host. (Skip this if you override to
@@ -97,28 +98,45 @@ There is no separate Docker Compose stack and no in-process mode.
 ### 1. Create a single-node GPU cluster
 
 ```bash
-k3d cluster create formica \
-  --gpus all \
-  --volume "/opt/models:/opt/models@all" \
-  --port "8080:8080@loadbalancer" \
-  --port "7474:7474@loadbalancer" \
-  --port "7687:7687@loadbalancer"
+# Install k3s as a systemd service. k3s v1.34+ auto-registers
+# nvidia-container-runtime when it finds it in PATH.
+curl -sfL https://get.k3s.io | \
+  INSTALL_K3S_EXEC="--disable=traefik --write-kubeconfig-mode=644" sh -
 
-kubectl apply -f \
-  https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.15.0/deployments/static/nvidia-device-plugin.yml
+# Register the nvidia RuntimeClass.
+cat <<'YAML' | sudo k3s kubectl apply -f -
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata: { name: nvidia }
+handler: nvidia
+YAML
+
+# Install the NVIDIA device plugin and pin it to the nvidia runtime.
+sudo k3s kubectl apply -f \
+  https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.17.0/deployments/static/nvidia-device-plugin.yml
+sudo k3s kubectl -n kube-system patch daemonset nvidia-device-plugin-daemonset \
+  --type=json \
+  -p '[{"op":"add","path":"/spec/template/spec/runtimeClassName","value":"nvidia"}]'
 ```
 
 ### 2. Deploy Formica
 
 ```bash
 git clone https://github.com/abacus2000/formica.git && cd formica
-kubectl apply -k deploy/k8s/overlays/dev
-kubectl -n formica rollout status deploy/vllm --timeout=15m
+# Build the controller image into k3s's containerd image store.
+# See docs/launch-on-aws.md for the BuildKit setup.
+sudo buildctl build \
+  --frontend dockerfile.v0 \
+  --local context=. --local dockerfile=. \
+  --output type=image,name=docker.io/library/formica:latest
+
+sudo k3s kubectl apply -k deploy/k8s/overlays/dev
+sudo k3s kubectl -n formica rollout status deploy/vllm --timeout=20m
 ```
 
-The `vllm` rollout is the slow one (60-120s on the prebaked GPU AMI,
-up to 15 minutes if weights are downloaded from HuggingFace). The
-controller, Neo4j, and OTEL collector come up in seconds.
+The `vllm` rollout is the slow one: ~10 GB image pull plus 60-120s
+model load from pre-staged AWQ weights. The controller, Neo4j, and
+OTEL collector come up in seconds.
 
 ### 3. Submit an objective
 
@@ -157,7 +175,8 @@ formica solve "Prove sqrt(2) is irrational with three independent methods" \
   --budget 2 --timeout 600 --env prod --region us-east-1
 ```
 
-Full walkthrough: [`docs/single-box.md`](docs/single-box.md).
+Step-by-step EC2 recipe: [`docs/launch-on-aws.md`](docs/launch-on-aws.md).
+Conceptual walkthrough: [`docs/single-box.md`](docs/single-box.md).
 
 ## Observability
 
