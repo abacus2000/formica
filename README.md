@@ -25,10 +25,12 @@ graph with pheromone-weighted edges, stored in Neo4j.
   consolidation phases based on pheromone entropy.
 - **Alarm propagation.** Fast, short-lived pheromone that preempts
   work on failure or hallucination.
-- **Capacity awareness, never provisioning.** The spawn controller
-  observes cluster headroom each tick and schedules within it. It
-  never requests new compute. Nodes added at runtime are absorbed
-  passively on the next tick.
+- **Capacity awareness, never overprovisioning.** The spawn
+  controller checks cluster headroom each tick and only schedules
+  more Worker, Validator, or Judge pods when there is room for them.
+  When headroom runs out it throttles, retires lower-priority pods,
+  or waits - it never schedules past what the cluster can run. Nodes
+  added at runtime are absorbed passively on the next tick.
 
 ### Architecture
 
