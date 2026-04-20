@@ -38,7 +38,7 @@ graph with pheromone-weighted edges, stored in Neo4j.
 flowchart LR
     CLI["formica solve<br/>(thin client)"]
 
-    subgraph cluster["Kubernetes cluster (k3d or EKS)"]
+    subgraph cluster["Kubernetes cluster (k3s or EKS)"]
         direction TB
 
         CTRL["Controller<br/>capacity-aware<br/>spawn / retire"]
@@ -81,12 +81,13 @@ within whatever cluster headroom happens to exist.
 ## Launch
 
 Formica is Kubernetes-native end-to-end. The same manifests work on a
-single box (via [k3d](https://k3d.io/)) and on a real EKS cluster.
-There is no separate Docker Compose stack and no in-process mode.
+single box (bare [k3s](https://k3s.io/) installed as a systemd service)
+and on a real EKS cluster. There is no separate Docker Compose stack,
+no Docker-in-the-middle, and no in-process mode.
 
 ### Prerequisites
 
-- Docker, `kubectl`, `kustomize`, and `k3d` on your PATH.
+- `curl`, `systemd`, and root access to install k3s.
 - For local GPU inference: an NVIDIA GPU with drivers and
   `nvidia-container-toolkit` installed, plus Mistral-7B-AWQ weights at
   `/opt/models/mistral-awq` on the host. (Skip this if you override to
@@ -94,44 +95,42 @@ There is no separate Docker Compose stack and no in-process mode.
 - For AWS observability: valid AWS credentials in the shell that runs
   `kubectl apply` (IRSA handles pod-level auth once deployed).
 
-### 1. Create a single-node GPU cluster
+### Single box on EC2 (one command)
+
+Launch a `g5.xlarge` on the rome AMI (`ami-079c82d610e02e480`) with a
+**200 GB gp3 root volume** and an instance profile carrying
+`AmazonSSMManagedInstanceCore`, then:
 
 ```bash
-k3d cluster create formica \
-  --gpus all \
-  --volume "/opt/models:/opt/models@all" \
-  --port "8080:8080@loadbalancer" \
-  --port "7474:7474@loadbalancer" \
-  --port "7687:7687@loadbalancer"
-
-kubectl apply -f \
-  https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.15.0/deployments/static/nvidia-device-plugin.yml
+aws ssm start-session --target i-XXXXXXXXXXXXXXXXX --region us-east-1
+sudo su - ec2-user
+git clone https://github.com/abacus2000/formica.git ~/formica
+cd ~/formica
+bash scripts/launch-single-box.sh
 ```
 
-### 2. Deploy Formica
+The script installs k3s + the NVIDIA device plugin, builds
+`formica:latest` into k3s's containerd store via BuildKit, deploys the
+dev overlay, waits for everything to roll out, and runs a `formica
+solve` smoke test. It takes ~10 minutes on a fresh instance, is
+idempotent, and refuses to run on a root volume that cannot fit the
+vLLM image.
+
+Knobs: `SKIP_SMOKE=1` stops after the rollout. Full documentation,
+including a manual step-by-step and troubleshooting, is in
+[`docs/launch-on-aws.md`](docs/launch-on-aws.md).
+
+### Submit more objectives
+
+The launcher leaves port-forwards running and env vars exported in its
+shell. From any new shell:
 
 ```bash
-git clone https://github.com/abacus2000/formica.git && cd formica
-kubectl apply -k deploy/k8s/overlays/dev
-kubectl -n formica rollout status deploy/vllm --timeout=15m
-```
-
-The `vllm` rollout is the slow one (60-120s on the prebaked GPU AMI,
-up to 15 minutes if weights are downloaded from HuggingFace). The
-controller, Neo4j, and OTEL collector come up in seconds.
-
-### 3. Submit an objective
-
-```bash
-pip install -e ".[dev]"
-
-# Port-forward Neo4j and vLLM so the CLI can reach them from outside
-# the cluster.
-kubectl -n formica port-forward svc/neo4j 7687:7687 &
-kubectl -n formica port-forward svc/vllm  8080:8080 &
-
+export KUBECONFIG=$HOME/.kube/config
 export FORMICA_NEO4J_URI=bolt://localhost:7687
 export FORMICA_MODEL_BASE_URL=http://localhost:8080/v1
+kubectl -n formica port-forward svc/neo4j 7687:7687 &
+kubectl -n formica port-forward svc/vllm  8080:8080 &
 
 formica solve "Prove sqrt(2) is irrational" --budget 1 --timeout 600
 ```
@@ -157,7 +156,9 @@ formica solve "Prove sqrt(2) is irrational with three independent methods" \
   --budget 2 --timeout 600 --env prod --region us-east-1
 ```
 
-Full walkthrough: [`docs/single-box.md`](docs/single-box.md).
+Step-by-step EC2 recipe: [`docs/launch-on-aws.md`](docs/launch-on-aws.md).
+Automated launcher: [`scripts/launch-single-box.sh`](scripts/launch-single-box.sh).
+Conceptual walkthrough: [`docs/single-box.md`](docs/single-box.md).
 
 ## Observability
 

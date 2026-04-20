@@ -25,6 +25,10 @@ spec:
       labels:
         app.kubernetes.io/component: neo4j
     spec:
+      # Kubernetes auto-injects *_PORT_* env vars for every Service in the
+      # namespace. Neo4j's strict config validator rejects them with
+      # 'Unrecognized setting' and refuses to start. Disable the link injection.
+      enableServiceLinks: false
       containers:
         - name: neo4j
           image: neo4j:5.26.24-community

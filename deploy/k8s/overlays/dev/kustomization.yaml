@@ -15,3 +15,28 @@ patches:
       - op: replace
         path: /spec/template/spec/containers/0/env/2/value
         value: us-east-1
+
+  # Swap the prod awss3+parquet exporter for a local debug exporter on dev.
+  # The contrib image ships the awss3 exporter but does not include the
+  # otlp_parquet marshaler (that requires a custom Collector build). The debug
+  # exporter is enough for the single-box smoke test and requires no AWS creds.
+  - target: { kind: ConfigMap, name: otel-collector-config }
+    patch: |-
+      - op: replace
+        path: /data/config.yaml
+        value: |
+          receivers:
+            otlp:
+              protocols:
+                grpc: { endpoint: 0.0.0.0:4317 }
+                http: { endpoint: 0.0.0.0:4318 }
+          processors:
+            batch: {}
+          exporters:
+            debug:
+              verbosity: normal
+          service:
+            pipelines:
+              traces:  { receivers: [otlp], processors: [batch], exporters: [debug] }
+              metrics: { receivers: [otlp], processors: [batch], exporters: [debug] }
+              logs:    { receivers: [otlp], processors: [batch], exporters: [debug] }
