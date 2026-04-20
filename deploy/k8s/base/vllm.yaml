@@ -29,6 +29,11 @@ spec:
         app.kubernetes.io/component: vllm
     spec:
       runtimeClassName: nvidia
+      # k8s service env vars (VLLM_PORT=tcp://...) collide with vLLM's own
+      # VLLM_PORT env var, which expects an integer port. The server reads
+      # the URI, fails to parse it, and crashes the engine on startup.
+      # See https://docs.vllm.ai/en/stable/serving/env_vars.html
+      enableServiceLinks: false
       containers:
         - name: vllm
           image: vllm/vllm-openai:latest
