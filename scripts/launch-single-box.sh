@@ -152,12 +152,12 @@ if ! pgrep -x buildkitd >/dev/null; then
     --containerd-worker-addr=/run/k3s/containerd/containerd.sock \
     --containerd-worker-namespace=k8s.io \
     >/var/log/buildkitd.log 2>&1 &'
-  # Wait for the socket to appear; bail if buildkitd died.
+  # /run/buildkit is mode 0770 root:root, so 'test -S' must run as root.
   for i in {1..20}; do
-    if [[ -S /run/buildkit/buildkitd.sock ]]; then break; fi
+    if sudo test -S /run/buildkit/buildkitd.sock; then break; fi
     sleep 1
   done
-  if [[ ! -S /run/buildkit/buildkitd.sock ]]; then
+  if ! sudo test -S /run/buildkit/buildkitd.sock; then
     echo "buildkitd failed to start. Last 40 lines of /var/log/buildkitd.log:"
     sudo tail -40 /var/log/buildkitd.log || true
     exit 1
