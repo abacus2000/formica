@@ -111,10 +111,11 @@ bash scripts/launch-single-box.sh
 
 The script installs k3s + the NVIDIA device plugin, builds
 `formica:latest` into k3s's containerd store via BuildKit, deploys the
-dev overlay, waits for everything to roll out, and runs a `formica
-solve` smoke test. It takes ~10 minutes on a fresh instance, is
-idempotent, and refuses to run on a root volume that cannot fit the
-vLLM image.
+dev overlay, waits for everything to roll out, and runs a final
+`kubectl exec -n formica deploy/formica-controller -- formica --help`
+smoke test against the controller pod. It takes ~10 minutes on a fresh
+instance, is idempotent, and refuses to run on a root volume that
+cannot fit the vLLM image.
 
 Knobs: `SKIP_SMOKE=1` stops after the rollout. Full documentation,
 including a manual step-by-step and troubleshooting, is in
@@ -122,17 +123,12 @@ including a manual step-by-step and troubleshooting, is in
 
 ### Submit more objectives
 
-The launcher leaves port-forwards running and env vars exported in its
-shell. From any new shell:
+Run solves inside the controller pod (Python 3.12 with the CLI and
+in-cluster access to Neo4j and vLLM already wired up):
 
 ```bash
-export KUBECONFIG=$HOME/.kube/config
-export FORMICA_NEO4J_URI=bolt://localhost:7687
-export FORMICA_MODEL_BASE_URL=http://localhost:8080/v1
-kubectl -n formica port-forward svc/neo4j 7687:7687 &
-kubectl -n formica port-forward svc/vllm  8080:8080 &
-
-formica solve "Prove sqrt(2) is irrational" --budget 1 --timeout 600
+kubectl exec -n formica deploy/formica-controller -- \
+  formica solve "Prove sqrt(2) is irrational" --budget 1 --timeout 600 --stream
 ```
 
 Validated Evidence streams to stdout as Validator pods emit it.
