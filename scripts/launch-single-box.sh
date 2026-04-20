@@ -70,13 +70,25 @@ fi
 nvidia-smi -L
 
 ROOT_FREE_GB=$(df -BG / | awk 'NR==2 {gsub("G",""); print $4}')
-note "Free space on /: ${ROOT_FREE_GB} GB"
-if [[ "$ROOT_FREE_GB" -lt 120 ]]; then
+ROOT_TOTAL_GB=$(df -BG / | awk 'NR==2 {gsub("G",""); print $2}')
+note "Root volume: ${ROOT_TOTAL_GB} GB total, ${ROOT_FREE_GB} GB free"
+
+# Two checks. Total size is structural and always enforced: under 150 GB
+# the vLLM image plus build cache plus kubelet ephemeral cannot all fit
+# at once and DiskPressure will evict pods during the first pull.
+if [[ "$ROOT_TOTAL_GB" -lt 150 ]]; then
   echo
-  echo "ERROR: less than 120 GB free on /. This run will fill the disk."
-  echo "       Launch the instance with a 200 GB gp3 root volume."
-  echo "       (k3s containerd needs ~40 GB for the vLLM image alone,"
-  echo "        plus the formica:latest build cache and kubelet ephemeral.)"
+  echo "ERROR: root volume is only ${ROOT_TOTAL_GB} GB. Need at least 200 GB."
+  echo "       Relaunch the instance with a 200 GB gp3 root volume."
+  exit 1
+fi
+
+# Free-space check is advisory and only matters on the very first run,
+# before we have pulled the vLLM image. After that, 80+ GB free is fine.
+if [[ "$ROOT_FREE_GB" -lt 60 ]]; then
+  echo
+  echo "ERROR: only ${ROOT_FREE_GB} GB free on /. Need 60 GB headroom."
+  echo "       Run 'sudo k3s ctr -n k8s.io images prune' or grow the volume."
   exit 1
 fi
 
