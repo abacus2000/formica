@@ -150,8 +150,8 @@ class Forum:
             rec = s.run(cypher, focus_id=focus_id).single()
             if rec is None:
                 return {"focus": None, "neighbors": [], "edges": []}
-            focus = dict(rec["focus"]) if rec["focus"] else None
-            neighbors = [dict(n) for n in rec["nbrs"] if n is not None]
+            focus = _node_to_dict(rec["focus"]) if rec["focus"] else None
+            neighbors = [_node_to_dict(n) for n in rec["nbrs"] if n is not None]
             # Flatten paths → distinct edge dicts keyed by elementId
             seen: dict[str, dict] = {}
             for path_rels in rec["rels"] or []:
@@ -256,3 +256,20 @@ class Forum:
 
 def new_id(prefix: str) -> str:
     return f"{prefix}-{uuid.uuid4().hex[:12]}"
+
+
+def _node_to_dict(node) -> dict:
+    """Convert a neo4j Node to a plain dict, preserving labels under `_labels`.
+
+    Agents filter neighborhoods by label (Scout/Forager/Validator all call
+    `_has_label`), so dropping labels on the way out of the DAL silently
+    breaks every caste. Kept as a small helper so the Forum is the single
+    place that knows how to flatten a node.
+    """
+    d = dict(node)
+    try:
+        d["_labels"] = list(node.labels)
+    except AttributeError:
+        # Defensive: plain dict or unexpected type; leave untouched.
+        pass
+    return d

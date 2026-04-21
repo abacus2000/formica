@@ -47,17 +47,25 @@ def _agent_for(component: str, forum: Forum, cfg: FormicaConfig) -> Agent:
 def _pick_focus(component: str, forum: Forum) -> str | None:
     """Pick a focus node id for this caste's tick."""
     if component == "scout":
-        # Pick any Objective/SubProblem.
+        # Scouts should only be handed nodes that have no SubProblem children
+        # yet. Otherwise we recursively decompose already-decomposed subtrees
+        # (issue #13). Objectives always qualify; SubProblems qualify only when
+        # no other SubProblem links to them via CHILD_OF.
         with forum._session() as s:  # noqa: SLF001
             rec = s.run(
-                "MATCH (n) WHERE (n:Objective OR n:SubProblem) RETURN n.id AS id "
-                "ORDER BY rand() LIMIT 1"
+                "MATCH (n) WHERE (n:Objective OR n:SubProblem) "
+                "AND NOT (:SubProblem)-[:CHILD_OF]->(n) "
+                "RETURN n.id AS id ORDER BY rand() LIMIT 1"
             ).single()
             return rec["id"] if rec else None
     if component == "forager":
+        # Prefer leaf SubProblems (no SubProblem children). Foragers produce
+        # Evidence on actionable leaves, not on internal decomposition nodes.
         with forum._session() as s:  # noqa: SLF001
             rec = s.run(
-                "MATCH (n:SubProblem) RETURN n.id AS id ORDER BY rand() LIMIT 1"
+                "MATCH (n:SubProblem) "
+                "WHERE NOT (:SubProblem)-[:CHILD_OF]->(n) "
+                "RETURN n.id AS id ORDER BY rand() LIMIT 1"
             ).single()
             return rec["id"] if rec else None
     if component.startswith("validator") or component.startswith("inquiline"):

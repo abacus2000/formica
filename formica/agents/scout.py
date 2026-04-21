@@ -32,6 +32,18 @@ class Scout(Agent):
         if not parent_id or not parent_text:
             return AgentResult(action="scout.no-op", notes="no focus")
 
+        # Guard against recursive over-decomposition (issue #13). A SubProblem
+        # that already has SubProblem children must not be decomposed again,
+        # otherwise scouts produce nested "Approach N: Approach N: ..." chains
+        # and foragers never find real leaves to work on. Objectives are always
+        # valid targets.
+        focus_labels = focus.get("_labels") or []
+        if "SubProblem" in focus_labels and _has_subproblem_child(focus, neighborhood):
+            return AgentResult(
+                action="scout.no-op",
+                notes="focus already decomposed",
+            )
+
         # LLM call is optional - a deterministic fallback lets us run without a model
         # (e.g. unit tests, the toy math e2e).
         subproblem_texts = self._decompose(parent_text)
@@ -74,3 +86,24 @@ class Scout(Agent):
             f"Approach 2 (alternative method): {text}",
             f"Approach 3 (cross-check): {text}",
         ]
+
+
+def _has_subproblem_child(focus: dict, neighborhood: dict) -> bool:
+    """True if `focus` has at least one incoming CHILD_OF edge from a SubProblem.
+
+    CHILD_OF points from child to parent, so an incoming edge (end == focus.id)
+    whose start is a SubProblem means this focus has been decomposed already.
+    """
+    focus_id = focus.get("id")
+    if not focus_id:
+        return False
+    neighbors_by_id = {n.get("id"): n for n in neighborhood.get("neighbors") or []}
+    for e in neighborhood.get("edges") or []:
+        if e.get("type") != "CHILD_OF":
+            continue
+        if e.get("end") != focus_id:
+            continue
+        child = neighbors_by_id.get(e.get("start")) or {}
+        if "SubProblem" in (child.get("_labels") or []):
+            return True
+    return False

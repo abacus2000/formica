@@ -268,59 +268,52 @@ def test_forager_no_op_when_no_subproblems_anywhere():
 
 
 # ---------------------------------------------------------------------------
-# BUG 2b: Forum.read_neighborhood contract - must include _labels.
+# BUG 2b: Forum._node_to_dict contract - labels must round-trip.
 #
-# This test pins down the root cause of the forager no-op we saw in production.
-# The current implementation returns dict(node) which only extracts properties,
-# not labels. Every agent that calls _has_label will see False.
+# The forager no-op in production traced back to Forum.read_neighborhood
+# flattening neo4j nodes with dict(node), which drops labels. Guards the
+# fix by calling the real helper against a fake neo4j Node.
 # ---------------------------------------------------------------------------
 
 
-class ForumWithoutLabels(Forum):
-    """Mimics the current production Forum.read_neighborhood behavior: does NOT
-    include _labels in returned node dicts. This is what ships today."""
+class _FakeNeoNode:
+    """Mimics neo4j.graph.Node for the label/property flattening contract.
 
-    def __init__(self):
-        self.config = FormicaConfig()
-        self._driver = None
-        self.inserted_evidence: list = []
-
-    def read_neighborhood(self, focus_id: str, radius: int = 2) -> dict:
-        # Exactly what the real Forum does today (forum.py lines 140-168):
-        # properties only, no labels.
-        if focus_id == "sp-leaf":
-            return {
-                "focus": {"id": "sp-leaf", "text": "leaf problem", "parent_id": "obj-1"},
-                "neighbors": [
-                    {"id": "obj-1", "objective": "top-level goal"},
-                ],
-                "edges": [{"id": "e0", "type": "CHILD_OF", "start": "sp-leaf", "end": "obj-1"}],
-            }
-        return {"focus": None, "neighbors": [], "edges": []}
-
-    def insert_evidence(self, ev) -> str:
-        self.inserted_evidence.append(ev)
-        return "edge-ev-0"
-
-    def deposit(self, *a, **kw):
-        pass
-
-
-def test_forum_contract_labels_missing_reproduces_forager_no_op():
-    """Pins down the production bug: the current Forum.read_neighborhood
-    omits _labels, so the forager cannot recognize a SubProblem and no-ops.
-
-    When this test starts failing (forager.evidence instead of forager.no-op),
-    it means Forum.read_neighborhood has been fixed to include labels and this
-    regression test should be deleted or flipped.
+    - dict(node) iterates (key, value) pairs (properties only)
+    - node.labels is a frozenset of labels
     """
-    forum = ForumWithoutLabels()
-    forager = Forager(agent_id="forager-test", caste="forager", forum=forum, focus_id="sp-leaf")
-    result = forager.tick()
 
-    # Today this asserts .no-op, confirming the bug.
-    assert result.action == "forager.no-op", (
-        f"Expected no-op given current Forum contract (no _labels), got {result.action!r}. "
-        f"If Forum.read_neighborhood now includes _labels, update this test."
-    )
-    assert forum.inserted_evidence == []
+    def __init__(self, labels: list[str], **props):
+        self._props = dict(props)
+        self.labels = frozenset(labels)
+
+    def keys(self):
+        return self._props.keys()
+
+    def __iter__(self):
+        return iter(self._props)
+
+    def __getitem__(self, key):
+        return self._props[key]
+
+
+def test_node_to_dict_preserves_labels():
+    from formica.blackboard.forum import _node_to_dict
+
+    node = _FakeNeoNode(["SubProblem"], id="sp-1", text="leaf problem", parent_id="obj-1")
+    d = _node_to_dict(node)
+
+    assert d["id"] == "sp-1"
+    assert d["text"] == "leaf problem"
+    assert "_labels" in d, "Forum must surface neo4j labels under _labels"
+    assert "SubProblem" in d["_labels"]
+
+
+def test_node_to_dict_handles_plain_dict_defensively():
+    """Helper should not crash when handed a plain dict (e.g. from a test fake)."""
+    from formica.blackboard.forum import _node_to_dict
+
+    d = _node_to_dict({"id": "x", "foo": "bar"})
+    assert d["id"] == "x"
+    assert d["foo"] == "bar"
+    # No _labels key required; just must not raise.
