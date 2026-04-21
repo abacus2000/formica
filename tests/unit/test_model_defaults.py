@@ -1,8 +1,9 @@
 """Guardrail: the default FormicaConfig must target the open-weight GPU AMI.
 
-Per ADR-0007, Formica defaults to Mistral-7B-AWQ served by local vLLM on
-port 8080. If these tests fail, either the default was changed on purpose
-(update ADR-0007 and these tests) or by accident (revert).
+Per ADR-0007 (as amended by ADR-0009), Formica defaults to
+Qwen/Qwen2.5-7B-Instruct-AWQ served by local vLLM on port 8080. If these
+tests fail, either the default was changed on purpose (update the ADRs and
+these tests) or by accident (revert).
 """
 
 from __future__ import annotations
@@ -23,9 +24,9 @@ def _clean_env(monkeypatch):
             monkeypatch.delenv(k, raising=False)
 
 
-def test_default_model_is_mistral_awq():
+def test_default_model_is_qwen25_awq():
     cfg = FormicaConfig()
-    assert cfg.model_id == "TheBloke/Mistral-7B-Instruct-v0.2-AWQ"
+    assert cfg.model_id == "Qwen/Qwen2.5-7B-Instruct-AWQ"
 
 
 def test_default_model_base_url_targets_in_cluster_vllm():

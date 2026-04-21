@@ -18,6 +18,30 @@ spec:
       labels:
         app.kubernetes.io/component: vllm
     spec:
+      # Stage Qwen AWQ weights on first start if not present on the host.
+      # See ADR-0009 for context.
+      initContainers:
+        - name: download-model
+          image: {{ .Values.vllm.image }}
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              DEST={{ .Values.vllm.modelPath }}
+              if [ -f "$DEST/config.json" ]; then
+                echo "Model weights already present at $DEST, skipping download."
+                exit 0
+              fi
+              mkdir -p "$DEST"
+              echo "Downloading {{ .Values.vllm.servedModelName }} into $DEST..."
+              huggingface-cli download {{ .Values.vllm.servedModelName }} \
+                --local-dir "$DEST" \
+                --local-dir-use-symlinks False
+              echo "Download complete."
+          volumeMounts:
+            - name: models-rw
+              mountPath: /models
       containers:
         - name: vllm
           image: {{ .Values.vllm.image }}
@@ -25,10 +49,16 @@ spec:
           args:
             - "--model={{ .Values.vllm.modelPath }}"
             - "--served-model-name={{ .Values.vllm.servedModelName }}"
-            - "--quantization=awq"
+            - "--quantization={{ .Values.vllm.quantization | default "awq" }}"
             - "--dtype=float16"
             - "--max-model-len={{ .Values.vllm.maxModelLen }}"
             - "--gpu-memory-utilization={{ .Values.vllm.gpuMemoryUtilization }}"
+            {{- if .Values.vllm.enableAutoToolChoice }}
+            - "--enable-auto-tool-choice"
+            {{- end }}
+            {{- if .Values.vllm.toolCallParser }}
+            - "--tool-call-parser={{ .Values.vllm.toolCallParser }}"
+            {{- end }}
             - "--host=0.0.0.0"
             - "--port=8080"
           ports:
@@ -48,6 +78,10 @@ spec:
             failureThreshold: 60
       volumes:
         - name: models
+          hostPath:
+            path: {{ .Values.vllm.hostModelsPath }}
+            type: Directory
+        - name: models-rw
           hostPath:
             path: {{ .Values.vllm.hostModelsPath }}
             type: Directory

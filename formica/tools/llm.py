@@ -54,9 +54,10 @@ def run_json(
 
     # Some models (notably Mistral-Instruct) enforce strict user/assistant
     # alternation in their chat template and reject a leading system message
-    # with HTTP 400 "Conversation roles must alternate ...". To stay portable
-    # across such models and real OpenAI alike, we fold the system_prompt into
-    # the first user message instead of passing it as a separate role.
+    # with HTTP 400 "Conversation roles must alternate ...". The current
+    # Qwen2.5 default does support system messages natively, but we keep
+    # folding the prompt into the first user turn so this wrapper stays
+    # portable across any OpenAI-compatible backend the user might plug in.
     merged_input = (
         f"{system_prompt}\n\n{input_text}" if system_prompt else input_text
     )

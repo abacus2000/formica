@@ -16,13 +16,19 @@ Any Linux box that has:
    on the PATH (install `nvidia-container-toolkit`). If you do not have a
    GPU, set `FORMICA_MODEL_PROVIDER=bedrock` and skip the GPU bits.
 2. `curl`, `systemd`, and root access to install k3s.
-3. Mistral-7B-AWQ weights at `/opt/models/mistral-awq` on the host. The
-   vLLM pod mounts this via a `hostPath` volume.
+3. Model weights at `/opt/models/qwen-awq` on the host (the default is
+   Qwen/Qwen2.5-7B-Instruct-AWQ per ADR-0009). The vLLM pod's
+   initContainer will download them from Hugging Face on first start if
+   the directory is missing; pre-stage it to skip the ~5GB pull. The
+   pod mounts the directory via a `hostPath` volume.
 
 The canonical environment is a `g5.xlarge` (or `g4dn.xlarge`) launched
 from the prebaked open-weight AMI (`ami-079c82d610e02e480`) shared with
 the [rome](https://github.com/abacus2000/rome) project. That AMI already
-has everything in items 1–3.
+has items 1 and 2 in place. For item 3, the AMI ships older
+Mistral-7B-AWQ weights at `/opt/models/mistral-awq`; on first vLLM pod
+start the initContainer will download Qwen AWQ into `/opt/models/qwen-awq`
+so you do not have to rebuild the AMI.
 
 For a step-by-step EC2 walkthrough, see [launch-on-aws.md](./launch-on-aws.md).
 
