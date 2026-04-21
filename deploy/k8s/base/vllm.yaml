@@ -2,10 +2,18 @@
 # vLLM model server. OpenAI-compatible API on :8080.
 #
 # Single-box (bare k3s on the prebaked GPU AMI): weights are bind-mounted from
-# the host at /opt/models/mistral-awq via a hostPath volume. The GPU is exposed
+# the host at /opt/models/qwen-awq via a hostPath volume. The GPU is exposed
 # to the pod via the NVIDIA device plugin daemonset. The pod runs under the
 # `nvidia` RuntimeClass so containerd launches it with nvidia-container-runtime,
 # which injects /dev/nvidia*, libraries, and CUDA driver into the container.
+#
+# The AMI (ami-079c82d610e02e480) originally shipped only Mistral-7B-AWQ at
+# /opt/models/mistral-awq. Per ADR-0009 we switched the default to
+# Qwen/Qwen2.5-7B-Instruct-AWQ (native tool calling + native system role +
+# stronger reasoning). The `download-model` initContainer pulls the Qwen AWQ
+# weights from Hugging Face into /opt/models/qwen-awq on first pod startup if
+# they are not already staged on the host, so the existing AMI keeps working
+# without a rebuild. Pre-seed the directory (e.g. via SSM) to skip the download.
 #
 # Multi-node (EKS): replace the hostPath volume with a PVC backed by a model
 # cache (e.g. EFS or an initContainer that rsyncs from S3). The Service name
@@ -34,17 +42,49 @@ spec:
       # the URI, fails to parse it, and crashes the engine on startup.
       # See https://docs.vllm.ai/en/stable/serving/env_vars.html
       enableServiceLinks: false
+      initContainers:
+        # Stage Qwen2.5-7B-Instruct-AWQ on the host if it is not already there.
+        # The prebaked rome AMI only ships Mistral weights; this makes the
+        # model swap work without rebuilding the AMI. Idempotent: if the
+        # directory already has config.json we skip the download.
+        - name: download-model
+          image: vllm/vllm-openai:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              DEST=/models/qwen-awq
+              if [ -f "$DEST/config.json" ]; then
+                echo "Qwen AWQ weights already present at $DEST, skipping download."
+                exit 0
+              fi
+              mkdir -p "$DEST"
+              echo "Downloading Qwen/Qwen2.5-7B-Instruct-AWQ into $DEST..."
+              # huggingface-cli ships with the vllm-openai image.
+              huggingface-cli download Qwen/Qwen2.5-7B-Instruct-AWQ \
+                --local-dir "$DEST" \
+                --local-dir-use-symlinks False
+              echo "Download complete."
+          volumeMounts:
+            - name: models-rw
+              mountPath: /models
       containers:
         - name: vllm
           image: vllm/vllm-openai:latest
           imagePullPolicy: IfNotPresent
           args:
-            - "--model=/models/mistral-awq"
-            - "--served-model-name=TheBloke/Mistral-7B-Instruct-v0.2-AWQ"
-            - "--quantization=awq"
+            - "--model=/models/qwen-awq"
+            - "--served-model-name=Qwen/Qwen2.5-7B-Instruct-AWQ"
+            - "--quantization=awq_marlin"
             - "--dtype=float16"
             - "--max-model-len=4096"
             - "--gpu-memory-utilization=0.85"
+            # Qwen2.5 exposes native tool calling; vLLM needs both flags
+            # below to accept `tool_choice="auto"` from the forager caste.
+            # See ADR-0009 and issue #24.
+            - "--enable-auto-tool-choice"
+            - "--tool-call-parser=hermes"
             - "--host=0.0.0.0"
             - "--port=8080"
           ports:
@@ -71,7 +111,16 @@ spec:
             periodSeconds: 30
             timeoutSeconds: 5
       volumes:
+        # Read-only mount for the serving container: vLLM should never mutate
+        # the weights directory.
         - name: models
+          hostPath:
+            path: /opt/models
+            type: Directory
+        # Read-write mount for the initContainer so it can stage weights on
+        # first pod startup. Same hostPath, different volume entry so the
+        # main container can stay read-only.
+        - name: models-rw
           hostPath:
             path: /opt/models
             type: Directory

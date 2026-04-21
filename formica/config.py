@@ -20,12 +20,16 @@ class FormicaConfig(BaseSettings):
 
     # LLM model.
     #
-    # Formica defaults to the open-weight model pre-baked into the GPU AMI
-    # (shared with the rome project): Mistral-7B-Instruct-v0.2-AWQ, served
-    # by vLLM on :8080 with an OpenAI-compatible API. Weights live at
-    # /opt/models/mistral-awq on the AMI and are mounted into the vLLM pod
-    # read-only so nothing is downloaded at boot. See docs/single-box.md and
-    # docs/decisions/0007-open-weight-default.md.
+    # Formica defaults to an open-weight model served by in-cluster vLLM on
+    # :8080 (OpenAI-compatible API). Per ADR-0009 the default is
+    # Qwen/Qwen2.5-7B-Instruct-AWQ: native system-role support, native tool
+    # calling (closes issue #24), and much stronger reasoning than the
+    # previous Mistral-7B default. Weights land at /opt/models/qwen-awq on
+    # the host; the vLLM Deployment has an initContainer that downloads them
+    # from Hugging Face on first start if they are not already staged (so
+    # the existing rome AMI keeps working without a rebuild). See
+    # docs/single-box.md, docs/decisions/0007-open-weight-default.md, and
+    # docs/decisions/0009-switch-default-to-qwen25.md.
     #
     # The default base_url targets in-cluster DNS (the `vllm` Service in the
     # `formica` namespace). The CLI, when run from outside the cluster,
@@ -34,7 +38,7 @@ class FormicaConfig(BaseSettings):
     # To switch to another provider (e.g. Bedrock for prod) override with env:
     #   FORMICA_MODEL_PROVIDER=bedrock FORMICA_MODEL_ID=anthropic.claude-3-...
     model_base_url: str = "http://vllm.formica.svc.cluster.local:8080/v1"
-    model_id: str = "TheBloke/Mistral-7B-Instruct-v0.2-AWQ"
+    model_id: str = "Qwen/Qwen2.5-7B-Instruct-AWQ"
     model_provider: str = "openai"  # openai | ollama | bedrock
     # API key for OpenAI-compatible endpoints. Optional for local vLLM (it
     # ignores the value) but required by the underlying `openai.AsyncOpenAI`

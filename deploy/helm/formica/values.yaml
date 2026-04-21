@@ -36,18 +36,23 @@ neo4j:
   user: "neo4j"
   password: "changeme"
 
-# In-cluster vLLM (open-weight default, per ADR-0007).
+# In-cluster vLLM (open-weight default, per ADR-0007 as amended by ADR-0009).
 # Disable (vllm.enabled=false) when pointing model_base_url at an external
 # provider, e.g. Bedrock in prod. Single-box k3d users leave this on.
 vllm:
   enabled: true
   image: "vllm/vllm-openai:latest"
-  modelPath: "/models/mistral-awq"
-  servedModelName: "TheBloke/Mistral-7B-Instruct-v0.2-AWQ"
+  modelPath: "/models/qwen-awq"
+  servedModelName: "Qwen/Qwen2.5-7B-Instruct-AWQ"
+  quantization: "awq_marlin"
   maxModelLen: 4096
   gpuMemoryUtilization: 0.85
   gpuCount: 1
   hostModelsPath: "/opt/models"
+  # Qwen2.5 supports native tool calling; set to false only if you swap to
+  # a model that does not (e.g. plain Mistral-Instruct). See ADR-0009.
+  enableAutoToolChoice: true
+  toolCallParser: "hermes"
 
 otel:
   endpoint: "http://otel-collector.formica.svc.cluster.local:4317"

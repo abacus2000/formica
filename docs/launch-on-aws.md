@@ -3,14 +3,18 @@
 This is the exact recipe that brings up a working Formica cluster on AWS
 from scratch. It uses the prebaked open-weight AMI from the
 [rome](https://github.com/abacus2000/rome) project, which ships with
-CUDA 13, NVIDIA drivers, `nvidia-container-toolkit`, `nerdctl`, and the
-Mistral-7B-Instruct-v0.2-AWQ weights already staged at
-`/opt/models/mistral-awq`.
+CUDA 13, NVIDIA drivers, `nvidia-container-toolkit`, and `nerdctl`.
+The AMI also has older Mistral-7B-Instruct-v0.2-AWQ weights at
+`/opt/models/mistral-awq` that Formica no longer uses by default. Per
+ADR-0009 the current default model is Qwen/Qwen2.5-7B-Instruct-AWQ; the
+vLLM pod's initContainer downloads those weights into
+`/opt/models/qwen-awq` on first start (~5GB, a few minutes on a g5.xlarge).
 
 If you are on a different AMI, first install drivers and
 `nvidia-container-toolkit` per the
-[NVIDIA docs](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
-and stage weights yourself. Everything else below is identical.
+[NVIDIA docs](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
+You do not need to stage weights yourself; the initContainer handles it.
+Everything else below is identical.
 
 ## TL;DR
 

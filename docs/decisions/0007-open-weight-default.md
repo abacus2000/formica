@@ -1,6 +1,9 @@
 # ADR 0007: Default to open-weight Mistral-7B-AWQ served by local vLLM
 
-- Status: Accepted (amended 2026-04-19, see ADR-0008)
+- Status: Accepted (amended 2026-04-19, see ADR-0008; amended
+  2026-04-21, see ADR-0009 which changes the specific model from
+  Mistral-7B-AWQ to Qwen2.5-7B-Instruct-AWQ while keeping the
+  open-weight-first posture)
 - Date: 2026-04-19
 
 ## Context

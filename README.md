@@ -89,9 +89,12 @@ no Docker-in-the-middle, and no in-process mode.
 
 - `curl`, `systemd`, and root access to install k3s.
 - For local GPU inference: an NVIDIA GPU with drivers and
-  `nvidia-container-toolkit` installed, plus Mistral-7B-AWQ weights at
-  `/opt/models/mistral-awq` on the host. (Skip this if you override to
-  Bedrock or OpenAI via `FORMICA_MODEL_PROVIDER`.)
+  `nvidia-container-toolkit` installed. The default model is
+  Qwen/Qwen2.5-7B-Instruct-AWQ; the vLLM pod's initContainer downloads
+  the weights to `/opt/models/qwen-awq` on first start if they are not
+  already there. Pre-stage the directory to skip the ~5GB download.
+  (Skip this whole block if you override to Bedrock via
+  `FORMICA_MODEL_PROVIDER=bedrock`.)
 - For AWS observability: valid AWS credentials in the shell that runs
   `kubectl apply` (IRSA handles pod-level auth once deployed).
 
