@@ -61,10 +61,17 @@ spec:
               fi
               mkdir -p "$DEST"
               echo "Downloading Qwen/Qwen2.5-7B-Instruct-AWQ into $DEST..."
-              # huggingface-cli ships with the vllm-openai image.
-              huggingface-cli download Qwen/Qwen2.5-7B-Instruct-AWQ \
-                --local-dir "$DEST" \
-                --local-dir-use-symlinks False
+              # The `hf` CLI replaces the deprecated `huggingface-cli` in
+              # recent huggingface_hub versions; both ship with the
+              # vllm-openai image. Prefer `hf` since `huggingface-cli`
+              # now exits non-zero on some builds.
+              if command -v hf >/dev/null 2>&1; then
+                hf download Qwen/Qwen2.5-7B-Instruct-AWQ --local-dir "$DEST"
+              else
+                huggingface-cli download Qwen/Qwen2.5-7B-Instruct-AWQ \
+                  --local-dir "$DEST" \
+                  --local-dir-use-symlinks False
+              fi
               echo "Download complete."
           volumeMounts:
             - name: models-rw

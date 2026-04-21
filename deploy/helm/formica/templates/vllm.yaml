@@ -35,9 +35,14 @@ spec:
               fi
               mkdir -p "$DEST"
               echo "Downloading {{ .Values.vllm.servedModelName }} into $DEST..."
-              huggingface-cli download {{ .Values.vllm.servedModelName }} \
-                --local-dir "$DEST" \
-                --local-dir-use-symlinks False
+              # Prefer `hf`; fall back to the deprecated `huggingface-cli`.
+              if command -v hf >/dev/null 2>&1; then
+                hf download {{ .Values.vllm.servedModelName }} --local-dir "$DEST"
+              else
+                huggingface-cli download {{ .Values.vllm.servedModelName }} \
+                  --local-dir "$DEST" \
+                  --local-dir-use-symlinks False
+              fi
               echo "Download complete."
           volumeMounts:
             - name: models-rw
