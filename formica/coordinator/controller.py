@@ -157,10 +157,19 @@ class Controller:
         """One controller tick. Returns the per-pool budget decisions taken."""
         tracer = get_tracer("formica.controller")
         with tracer.start_as_current_span("controller.tick") as span:
-            phase, changed = self.phase_state.transition(entropy)
-            if changed:
-                log.info("phase transition", extra={"phase": phase.value, "entropy": entropy})
-                span.add_event("phase_transition", {"phase": phase.value, "entropy": entropy})
+            # MVP: when FORMICA_PHASES != "on" we pin to exploration and skip
+            # the entropy-driven hysteresis transition. This gives a fixed,
+            # deterministic caste mix that is easier to reason about when
+            # studying the system. Flip FORMICA_PHASES=on to restore
+            # entropy-driven phase cycling (see coordinator/phases.py).
+            if self.config.phases == "on":
+                phase, changed = self.phase_state.transition(entropy)
+                if changed:
+                    log.info("phase transition", extra={"phase": phase.value, "entropy": entropy})
+                    span.add_event("phase_transition", {"phase": phase.value, "entropy": entropy})
+            else:
+                phase = self.phase_state.phase  # stays EXPLORATION (default)
+                changed = False
 
             now = time.monotonic()
             compute_seconds = max(0.0, now - (self._last_tick_monotonic or now))
