@@ -144,6 +144,62 @@ watch kubectl -n formica get pods                       # live caste mix
 open http://localhost:7474                              # Neo4j browser
 ```
 
+### MVP: API quick-test from your laptop
+
+The slim MVP exposes a minimal HTTP API (`formica-api` Deployment, port
+8000) so you can poke the colony from your laptop without a CLI install.
+Full notes in [`FOLLOWUPS.md`](FOLLOWUPS.md); shortest path:
+
+**1. Install the AWS SSM session plugin** (one time, macOS):
+
+```bash
+curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/mac/sessionmanager-bundle.zip" -o /tmp/sm.zip
+unzip /tmp/sm.zip -d /tmp/sm && sudo /tmp/sm/sessionmanager-bundle/install -i /usr/local/sessionmanagerplugin -b /usr/local/bin/session-manager-plugin
+```
+
+**2. Open two terminals on the instance.** Terminal A holds the
+port-forward, terminal B submits the objective:
+
+```bash
+# terminal A
+aws ssm start-session --target i-XXXXXXXXXXXXXXXXX --region us-east-1
+sudo kubectl -n formica port-forward svc/formica-api 8000:8000
+```
+
+```bash
+# terminal B (same instance, separate SSM session)
+aws ssm start-session --target i-XXXXXXXXXXXXXXXXX --region us-east-1
+curl -X POST http://localhost:8000/v1/objectives \
+  -H 'content-type: application/json' \
+  -d '{"problem":"prove that sqrt(2) is irrational","budget_usd":1}'
+# -> {"objective_id":"obj-XXXX","run_id":"..."}
+```
+
+**3. Watch the colony fill in the graph:**
+
+```bash
+OBJ=obj-XXXX                                 # paste the id from step 2
+curl -sS http://localhost:8000/v1/objectives/$OBJ          | python3 -m json.tool
+curl -sS http://localhost:8000/v1/objectives/$OBJ/graph -o /tmp/g.json
+python3 -c 'import json; g=json.load(open("/tmp/g.json")); \
+  n=g["neighbors"]; \
+  print("subproblems:", sum(1 for x in n if "SubProblem" in x["_labels"])); \
+  print("evidence:   ", sum(1 for x in n if "Evidence"   in x["_labels"]))'
+```
+
+**Endpoints:**
+
+- `POST /v1/objectives` - submit a problem
+- `GET /v1/objectives/{id}` - status + validated evidence
+- `GET /v1/objectives/{id}/graph` - full neighborhood with pheromones
+- `GET /v1/healthz` - Neo4j reachability
+
+**Stop the box when done studying** (preserves AWS credits):
+
+```bash
+aws ec2 stop-instances --instance-ids i-XXXXXXXXXXXXXXXXX --region us-east-1
+```
+
 ### Multi-node (EKS)
 
 Same manifests, with a prod overlay that swaps the vLLM `hostPath` for
