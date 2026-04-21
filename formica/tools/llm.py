@@ -52,9 +52,17 @@ def run_json(
         log.warning("strands unavailable, caller should use fallback")
         return None
 
+    # Some models (notably Mistral-Instruct) enforce strict user/assistant
+    # alternation in their chat template and reject a leading system message
+    # with HTTP 400 "Conversation roles must alternate ...". To stay portable
+    # across such models and real OpenAI alike, we fold the system_prompt into
+    # the first user message instead of passing it as a separate role.
+    merged_input = (
+        f"{system_prompt}\n\n{input_text}" if system_prompt else input_text
+    )
     try:
-        agent = Agent(model=_model(cfg), system_prompt=system_prompt, tools=tools or [])
-        out = str(agent(input_text))
+        agent = Agent(model=_model(cfg), tools=tools or [])
+        out = str(agent(merged_input))
     except Exception as e:
         # The fallback paths that call this function swallow their own
         # exceptions, so log loudly here to make silent LLM outages visible
@@ -68,7 +76,8 @@ def run_json(
             return json.loads(out[start:end])
         except Exception:
             pass
-    # Followup asking strictly for JSON.
+    # Followup asking strictly for JSON. Same alternation caveat applies, but
+    # a plain user-follow-up after the assistant reply is already valid.
     try:
         out2 = str(agent("Respond with ONLY a JSON object this time. No prose."))
     except Exception as e:
