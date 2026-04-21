@@ -56,6 +56,16 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(payload, default=str)
 
 
+# Noisy third-party loggers that should be quieter than the root level.
+# neo4j.notifications emits a WARNING for every Cypher query whose properties
+# or relationship types don't yet exist in the graph. While the colony is
+# bootstrapping (or running with an empty graph) this floods the controller
+# log with a new entry every ~10s per query. See issue #14.
+_QUIET_LOGGERS: dict[str, int] = {
+    "neo4j.notifications": logging.ERROR,
+}
+
+
 def configure_logging(level: int = logging.INFO) -> None:
     """Configure root logger for JSON output. Idempotent."""
     root = logging.getLogger()
@@ -66,6 +76,8 @@ def configure_logging(level: int = logging.INFO) -> None:
     handler.setFormatter(JsonFormatter())
     root.addHandler(handler)
     root.setLevel(level)
+    for name, lvl in _QUIET_LOGGERS.items():
+        logging.getLogger(name).setLevel(lvl)
     setattr(root, "_formica_configured", True)
 
 
