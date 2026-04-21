@@ -14,8 +14,18 @@ log = logging.getLogger(__name__)
 def _model(cfg: FormicaConfig):
     if cfg.model_provider in ("openai", "vllm"):
         from strands.models.openai import OpenAIModel
+        # The underlying `openai.AsyncOpenAI` client refuses to start without
+        # an api_key, even when talking to a local vLLM server that ignores it.
+        # We therefore always pass a key: either the configured one (for real
+        # OpenAI) or a harmless placeholder (for vLLM / any OpenAI-compatible
+        # local server). Without this, every agent tick silently fell into the
+        # `no LLM` fallback path and produced naive non-LLM results.
+        client_args: dict[str, Any] = {
+            "base_url": cfg.model_base_url,
+            "api_key": cfg.model_api_key or "not-needed",
+        }
         return OpenAIModel(
-            client_args={"base_url": cfg.model_base_url},
+            client_args=client_args,
             model_id=cfg.model_id,
         )
     if cfg.model_provider == "ollama":
@@ -39,11 +49,18 @@ def run_json(
     try:
         from strands import Agent  # type: ignore
     except Exception:
-        log.debug("strands unavailable, caller should use fallback")
+        log.warning("strands unavailable, caller should use fallback")
         return None
 
-    agent = Agent(model=_model(cfg), system_prompt=system_prompt, tools=tools or [])
-    out = str(agent(input_text))
+    try:
+        agent = Agent(model=_model(cfg), system_prompt=system_prompt, tools=tools or [])
+        out = str(agent(input_text))
+    except Exception as e:
+        # The fallback paths that call this function swallow their own
+        # exceptions, so log loudly here to make silent LLM outages visible
+        # (e.g. missing api_key, DNS resolution, vLLM down).
+        log.warning("LLM call failed: %s: %s", type(e).__name__, e)
+        return None
     start = out.find("{")
     end = out.rfind("}") + 1
     if start >= 0 and end > start:
@@ -52,7 +69,11 @@ def run_json(
         except Exception:
             pass
     # Followup asking strictly for JSON.
-    out2 = str(agent("Respond with ONLY a JSON object this time. No prose."))
+    try:
+        out2 = str(agent("Respond with ONLY a JSON object this time. No prose."))
+    except Exception as e:
+        log.warning("LLM followup call failed: %s: %s", type(e).__name__, e)
+        return None
     s2 = out2.find("{")
     e2 = out2.rfind("}") + 1
     if s2 >= 0 and e2 > s2:

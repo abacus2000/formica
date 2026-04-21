@@ -36,6 +36,11 @@ class FormicaConfig(BaseSettings):
     model_base_url: str = "http://vllm.formica.svc.cluster.local:8080/v1"
     model_id: str = "TheBloke/Mistral-7B-Instruct-v0.2-AWQ"
     model_provider: str = "openai"  # openai | ollama | bedrock
+    # API key for OpenAI-compatible endpoints. Optional for local vLLM (it
+    # ignores the value) but required by the underlying `openai.AsyncOpenAI`
+    # client, which refuses to initialise without one. Leave empty to use the
+    # placeholder "not-needed"; set FORMICA_MODEL_API_KEY for real OpenAI.
+    model_api_key: str = ""
 
     # Kubernetes
     namespace: str = "formica"
