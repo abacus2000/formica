@@ -16,11 +16,22 @@ _INITIALIZED = False
 
 
 def setup_otel(component: str, config: FormicaConfig | None = None) -> None:
-    """Configure OTLP exporters keyed by component, env, and region."""
+    """Configure OTLP exporters keyed by component, env, and region.
+
+    MVP: when FORMICA_OBSERVABILITY != "on" this is a no-op. Agents still
+    log to stdout via structlog (see telemetry/logs.py), and get_tracer()
+    still works (returns a no-op tracer), so no call sites need to change.
+    Flip FORMICA_OBSERVABILITY=on and re-add otel-collector + fluent-bit
+    to deploy/k8s/base/kustomization.yaml to turn the pipeline back on.
+    """
     global _INITIALIZED
     if _INITIALIZED:
         return
     cfg = config or FormicaConfig()
+
+    if cfg.observability != "on":
+        _INITIALIZED = True
+        return
 
     try:
         from opentelemetry import trace

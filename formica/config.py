@@ -63,4 +63,27 @@ class FormicaConfig(BaseSettings):
     validated_threshold: float = 0.7
     n_stable_cycles: int = 3
 
+    # MVP feature flags. Single knob per subsystem so you can re-enable
+    # without a code change. Default values are chosen for a minimal,
+    # deterministic single-box setup that is easy to study. Flip any of
+    # these to "on" via env (e.g. FORMICA_PHASES=on) to restore the full
+    # behavior. Kept as strings (not bools) so operators can read what is
+    # enabled at a glance in `kubectl describe pod`.
+    #
+    # observability: gates OTEL tracing + structured-log CloudWatch export.
+    #   When off, agents still log to stdout (captured by kubectl logs),
+    #   just no OTLP push or S3 Parquet sink.
+    # phases: gates entropy-driven phase cycling in the controller. When
+    #   off the controller pins a fixed exploration-weighted caste mix,
+    #   which is easier to reason about when you are learning the system.
+    # inquilines: gates the specialist castes (citation-checker,
+    #   numeric-sanity). Off means Validators do all judging.
+    # alarm_preempt_enabled: gates fast-decay alarm preemption. Off means
+    #   Alarm nodes are still written for observability but the controller
+    #   does not preempt active work on them.
+    observability: str = "off"
+    phases: str = "off"
+    inquilines: str = "off"
+    alarm_preempt_enabled: str = "off"
+
     model_config = {"env_prefix": "FORMICA_", "extra": "ignore"}

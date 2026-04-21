@@ -7,9 +7,13 @@ resources:
   - neo4j.yaml
   - vllm.yaml
   - controller.yaml
+  - api.yaml
   - evaporation-cron.yaml
-  - ../../otel-collector
-  - ../../fluent-bit
+  # MVP: observability stack disabled for credit preservation. Re-add
+  # these two lines and set FORMICA_OBSERVABILITY=on to turn OTEL + Fluent
+  # Bit back on. Everything else (Controller, Forum, vLLM) is unchanged.
+  # - ../../otel-collector
+  # - ../../fluent-bit
 
 labels:
   - pairs:
