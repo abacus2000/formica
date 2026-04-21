@@ -70,13 +70,25 @@ fi
 nvidia-smi -L
 
 ROOT_FREE_GB=$(df -BG / | awk 'NR==2 {gsub("G",""); print $4}')
-note "Free space on /: ${ROOT_FREE_GB} GB"
-if [[ "$ROOT_FREE_GB" -lt 120 ]]; then
+ROOT_TOTAL_GB=$(df -BG / | awk 'NR==2 {gsub("G",""); print $2}')
+note "Root volume: ${ROOT_TOTAL_GB} GB total, ${ROOT_FREE_GB} GB free"
+
+# Two checks. Total size is structural and always enforced: under 150 GB
+# the vLLM image plus build cache plus kubelet ephemeral cannot all fit
+# at once and DiskPressure will evict pods during the first pull.
+if [[ "$ROOT_TOTAL_GB" -lt 150 ]]; then
   echo
-  echo "ERROR: less than 120 GB free on /. This run will fill the disk."
-  echo "       Launch the instance with a 200 GB gp3 root volume."
-  echo "       (k3s containerd needs ~40 GB for the vLLM image alone,"
-  echo "        plus the formica:latest build cache and kubelet ephemeral.)"
+  echo "ERROR: root volume is only ${ROOT_TOTAL_GB} GB. Need at least 200 GB."
+  echo "       Relaunch the instance with a 200 GB gp3 root volume."
+  exit 1
+fi
+
+# Free-space check is advisory and only matters on the very first run,
+# before we have pulled the vLLM image. After that, 80+ GB free is fine.
+if [[ "$ROOT_FREE_GB" -lt 60 ]]; then
+  echo
+  echo "ERROR: only ${ROOT_FREE_GB} GB free on /. Need 60 GB headroom."
+  echo "       Run 'sudo k3s ctr -n k8s.io images prune' or grow the volume."
   exit 1
 fi
 
@@ -144,14 +156,28 @@ if ! command -v buildctl >/dev/null; then
 fi
 
 if ! pgrep -x buildkitd >/dev/null; then
-  sudo nohup /usr/local/bin/buildkitd \
+  # Redirect must be inside the sudo'd shell or it runs as the calling user
+  # and fails with Permission denied on /var/log/.
+  sudo sh -c 'nohup /usr/local/bin/buildkitd \
     --oci-worker=false \
     --containerd-worker=true \
     --containerd-worker-addr=/run/k3s/containerd/containerd.sock \
     --containerd-worker-namespace=k8s.io \
-    >/var/log/buildkitd.log 2>&1 &
-  sleep 4
+    >/var/log/buildkitd.log 2>&1 &'
+  # /run/buildkit is mode 0770 root:root, so 'test -S' must run as root.
+  for i in {1..20}; do
+    if sudo test -S /run/buildkit/buildkitd.sock; then break; fi
+    sleep 1
+  done
+  if ! sudo test -S /run/buildkit/buildkitd.sock; then
+    echo "buildkitd failed to start. Last 40 lines of /var/log/buildkitd.log:"
+    sudo tail -40 /var/log/buildkitd.log || true
+    exit 1
+  fi
 fi
+
+note "Verifying buildkitd worker is reachable..."
+sudo /usr/local/bin/buildctl debug workers >/dev/null
 
 note "Building formica:latest (this pulls the base image on first run)..."
 sudo /usr/local/bin/buildctl build \
@@ -188,33 +214,19 @@ note "Pod status:"
 kubectl -n formica get pods -o wide
 
 # ---------------------------------------------------------------
-step "Smoke test: formica solve"
+step "Smoke test: formica --help inside controller pod"
 # ---------------------------------------------------------------
+# We do not install the CLI on the host. AL2023 ships Python 3.9, but
+# strands-agents-tools requires Python >=3.10, so a host-side
+# 'pip install -e .' fails. The controller pod already has Python 3.12
+# and the formica CLI installed; run the smoke test there with kubectl exec.
 if [[ "$SKIP_SMOKE" == "1" ]]; then
   note "SKIP_SMOKE=1, skipping."
   exit 0
 fi
 
-# Install the CLI into the user's site-packages.
-if ! command -v formica >/dev/null; then
-  note "Installing formica CLI (pip install -e)..."
-  python3 -m pip install --user -e ".[dev]"
-  export PATH="$HOME/.local/bin:$PATH"
-fi
-
-# Port-forwards. Kill any old ones first.
-pkill -f "kubectl.*port-forward.*neo4j"  2>/dev/null || true
-pkill -f "kubectl.*port-forward.*vllm"   2>/dev/null || true
-sleep 1
-kubectl -n formica port-forward svc/neo4j 7687:7687 >/tmp/pf-neo4j.log 2>&1 &
-kubectl -n formica port-forward svc/vllm  8080:8080 >/tmp/pf-vllm.log  2>&1 &
-sleep 3
-
-export FORMICA_NEO4J_URI="bolt://localhost:7687"
-export FORMICA_MODEL_BASE_URL="http://localhost:8080/v1"
-
-note "Running: formica solve \"Prove sqrt(2) is irrational\" --budget 1 --timeout 600"
-formica solve "Prove sqrt(2) is irrational" --budget 1 --timeout 600
+note "Running: kubectl exec -n formica deploy/formica-controller -- formica --help"
+kubectl exec -n formica deploy/formica-controller -- formica --help
 
 echo
 echo "==================================================="

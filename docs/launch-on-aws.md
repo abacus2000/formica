@@ -76,8 +76,8 @@ What it does, in order:
    otel-collector ConfigMap (debug exporter, not the production
    parquet exporter).
 6. Waits for Neo4j, controller, otel, and vLLM to roll out.
-7. Installs the `formica` CLI, port-forwards Neo4j and vLLM to
-   localhost, and runs a `formica solve` smoke test.
+7. Runs a final `kubectl exec -n formica deploy/formica-controller -- formica --help`
+   smoke test against the controller pod.
 
 Set `SKIP_SMOKE=1` to stop after step 6. Other knobs
 (`K3S_VERSION`, `BUILDKIT_VERSION`, `DEVICE_PLUGIN_VER`) are documented
@@ -100,22 +100,56 @@ ephemeral Jobs, not long-lived Deployments.
 
 ## Running more solves
 
-After the script finishes, the CLI and port-forwards are already set
-up in the shell that ran it:
+Run solves inside the controller pod with `kubectl exec`. The controller
+image already has Python 3.12 and the `formica` CLI installed, and the
+pod is wired to Neo4j and vLLM via in-cluster Services, so no
+port-forwards or host-side installs are needed:
 
 ```bash
-formica solve "Prove there are infinitely many primes" --budget 1 --timeout 600
+kubectl exec -n formica deploy/formica-controller -- \
+  formica solve "Prove sqrt(2) is irrational" --budget 1 --timeout 600 --stream
 ```
 
-In a new shell, re-export the env vars and re-open the port-forwards:
+**Why not `pip install -e .` on the host?** Amazon Linux 2023 ships
+Python 3.9, but `strands-agents-tools>=0.1.0` (a transitive dependency)
+requires Python `>=3.10`. A host-side editable install fails at
+resolution. Rather than install a second Python toolchain on the host,
+the canonical single-box smoke test goes through `kubectl exec` into
+the controller pod, which already has a working environment.
 
-```bash
-export KUBECONFIG=$HOME/.kube/config
-export FORMICA_NEO4J_URI=bolt://localhost:7687
-export FORMICA_MODEL_BASE_URL=http://localhost:8080/v1
-kubectl -n formica port-forward svc/neo4j 7687:7687 &
-kubectl -n formica port-forward svc/vllm  8080:8080 &
+## Neo4j credentials
+
+The Neo4j container reads its password from the `neo4j-auth` Secret in
+the `formica` namespace (key `NEO4J_PASSWORD`). The default shipped in
+`deploy/k8s/base/neo4j.yaml` is `changeme`, which is fine for a
+single-box dev instance behind SSM with no inbound ports but is not
+appropriate for anything shared.
+
+To override, add a kustomize patch in your own overlay:
+
+```yaml
+# deploy/k8s/overlays/mydev/neo4j-auth.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: neo4j-auth
+  namespace: formica
+stringData:
+  NEO4J_PASSWORD: "your-strong-password"
 ```
+
+and reference it from the overlay's `kustomization.yaml`:
+
+```yaml
+resources:
+  - ../../base
+patches:
+  - path: neo4j-auth.yaml
+```
+
+The controller reads the same Secret via its Deployment env, so
+rotating the Secret and restarting both `neo4j-0` and
+`deploy/formica-controller` is sufficient.
 
 ## What the script is doing, manually
 
@@ -196,16 +230,8 @@ sudo k3s ctr -n k8s.io images ls -q | grep formica
 kubectl apply -k deploy/k8s/overlays/dev
 kubectl -n formica rollout status deploy/vllm --timeout=20m
 
-pip3 install --user -e ".[dev]"
-export PATH=$HOME/.local/bin:$PATH
-
-kubectl -n formica port-forward svc/neo4j 7687:7687 &
-kubectl -n formica port-forward svc/vllm  8080:8080 &
-
-export FORMICA_NEO4J_URI=bolt://localhost:7687
-export FORMICA_MODEL_BASE_URL=http://localhost:8080/v1
-
-formica solve "Prove sqrt(2) is irrational" --budget 1 --timeout 600
+kubectl exec -n formica deploy/formica-controller -- \
+  formica solve "Prove sqrt(2) is irrational" --budget 1 --timeout 600 --stream
 ```
 
 ## Troubleshooting
